@@ -3,6 +3,7 @@ import scipy as sc
 
 def pivot_matrix(M):
     """Returns the pivoting matrix for M, used in Doolittle's method."""
+    assert(M.shape[0]==M.shape[1], 'Matrix must be square')
     n = M.shape[0]
 
     # Create an identity matrix, with floating point values
@@ -22,6 +23,7 @@ def pivot_matrix(M):
 def lu_decomposition(A):
     """Performs an LU Decomposition of A (which must be square)
     into PA = LU. The function returns P, L, and U."""
+    assert(A.shape[0]==A.shape[1], 'Matrix must be square')
     n = A.shape[0]
 
     # Create zero matrices for L and U
@@ -108,3 +110,46 @@ A_inv = lu_inverse(P, L, U)
 print("A inv:", A_inv)
 print("A * A inv:", A @ A_inv)
 print("")
+
+
+# #does not provide eigenvectors
+
+# def gram_schmidt_qr(A):
+#     # Get the shape of A
+#     n = A.shape[0]
+
+#     # Create empty Q and R matrices
+#     Q = np.zeros((n, n))
+#     R = np.zeros((n, n))
+
+#     # The Gram-Schmidt process
+#     for i in range(n):
+#         # Start with the i-th column of A
+#         v = A[:, i]
+
+#         # Subtract the projections of v onto each column of Q
+#         for j in range(i):
+#             q = Q[:, j]
+#             R[j, i] = q @ v
+#             v = v - R[j, i] * q
+
+#         # Normalize v
+#         norm = np.linalg.norm(v)
+#         Q[:, i] = v / norm
+#         R[i, i] = norm
+
+#     return Q, R
+
+# def qr(A, k):
+#     for i in range(k):
+#         Q,R = gram_schmidt_qr(A);
+#         A = R @ Q
+#     return A, Q
+
+# def qr_diag(A, k):
+#     A_triangular, Q = qr(A, k)
+#     n=A.shape[0]
+#     D = np.zeros((n,n))
+#     for i in range(n):
+#         D[i,i] = A_triangular[i,i]
+#     return D, Q
