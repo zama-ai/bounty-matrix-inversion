@@ -41,27 +41,6 @@ def is_greater_or_equal(a, b, i=0):
     return (a[i]>b[i]) or ( (a[i]==b[i]) and is_greater_or_equal(a,b, i+1))
 
 
-# def base_p_division(dividend, divisor):
-#     # Initialize the quotient array
-#     quotient = np.zeros_like(dividend)
-#     # Initialize the remainder
-#     remainder = np.zeros_like(divisor)
-
-#     for i in range(len(dividend)):
-#         # Left-roll the remainder
-#         remainder = np.roll(remainder, -1)
-#         # Bring down the next bit from the dividend
-#         remainder[-1] = dividend[i]
-#         # If the remainder is larger than or equal to the divisor
-#         rem_ge_div = 1*is_greater_or_equal(remainder, divisor)
-#         # Subtract the divisor from the remainder
-#         remainder = (1-rem_ge_div)*remainder + rem_ge_div*base_p_subtraction(remainder, divisor)
-#         # Set the current quotient bit to rem_ge_div
-#         quotient[i] = rem_ge_div
-
-#     return quotient
-
-
 def base_p_division(dividend, divisor, p):
     # Initialize the quotient array
     quotient = np.zeros_like(dividend)
