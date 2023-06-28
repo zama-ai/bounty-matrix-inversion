@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "matrix-inversion"
+version = "0.1.0"
+description = ""
+authors = ["Lcressot <Lcressot@gmail.com>"]
+readme = "README.md"
+packages = [{include = "matrix_inversion"}]
+
+[tool.poetry.dependencies]
+python = ">=3.9, <3.12"
+concrete-python = "^1.0.0"
+ipykernel = "^6.23.1"
+scipy = "^1.11.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
