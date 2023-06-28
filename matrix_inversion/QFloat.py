@@ -87,6 +87,8 @@ class QFloat():
             if not (isinstance(ints, int) and 0<ints and array.size>=ints):
                 raise ValueError('ints must be in range [1,array.size]')
         self._ints = ints
+        self._isTidy = True # keep track of tidyness or the array
+        self._QFZero = None # keep a QFloat of zero for getting sign
 
     def __str__(self):
         """
@@ -94,8 +96,12 @@ class QFloat():
 
         WARNING : does not work in FHE
         """
-        integerPart = self._array[0:self._ints]
-        floatPart = self._array[self._ints:]
+        self.tidy() # tidy array before converting it to string
+
+        sgn = self.getSign()
+
+        integerPart = sgn*self._array[0:self._ints]
+        floatPart = sgn*self._array[self._ints:]
 
         if self._base <= 10:
             integerPart = ''.join([str(i) for i in integerPart])
@@ -104,7 +110,9 @@ class QFloat():
             integerPart = str(integerPart)
             floatPart = str(floatPart)
 
-        return integerPart+'.'+floatPart
+        sgnstr = '' if sgn else '-'
+
+        return sgnstr+integerPart+'.'+floatPart
 
     def fromFloat(f, length=10, ints=None, base=2):
         """
@@ -144,6 +152,15 @@ class QFloat():
             raise ValueError('length must be a positive int')
         return QFloat(fhe.zeros(length), ints, base)
 
+    def zero_like(other):
+        """
+        Create a QFloat of 0 with same shape as other
+        """
+        if not isinstance(other, QFloat):
+            raise ValueError('Object must be a QFloat')
+
+        return QFloat.zero(len(other), other._ints, other._base)
+
     def one(length, ints, base):
         """
         Create a QFloat of 1
@@ -152,23 +169,26 @@ class QFloat():
         array[ints-1] = fhe.ones(1)[0]
         return QFloat(array, ints, base)
 
+    def one_like(other):
+        """
+        Create a QFloat of 1 with same shape as other
+        """
+        if not isinstance(other, QFloat):
+            raise ValueError('Object must be a QFloat')
+
+        return QFloat.one(len(other), other._ints, other._base)
+
     def copy(self):
         """
         Create a QFloat copy
         """
-        return QFloat(self._array[:], self._ints, self._base)       
+        return self.__class__(self._array[:], self._ints, self._base)       
 
     def toArray(self):
         """
         Rerturn copy of array
         """
         return self._array[:]
-
-    def __len__(self):
-        """
-        Return length of array
-        """
-        return self._array.size
 
     def checkCompatibility(self, other):
         """
@@ -186,14 +206,44 @@ class QFloat():
         if self._ints != other._ints:
             raise ValueError('QFLoat have different dot index')        
 
+    def getSign(self):
+        """
+        Return the sign of the QFloat
+        Note: 0 is considered positive for faster computations
+        """
+        if not self._QFZero:
+            self._QFZero = QFloat.zero_like(self)
+
+        return self >= self._QFZero
+
+    # def tidy(self):
+    #     """
+    #     Tidy array so that values are in range [-base, base] as they should be
+    #     Keeping arrays untidy when possible saves computation time
+    #     """
+    #     abs_ge_base = np.abs(self._array) >= base
+
+    #     for i in reversed(range(len(self))):
+    #         abs_ge_base[i]
+
+    #     self._isTidy=True
+
+    def __len__(self):
+        """
+        Return length of array
+        """
+        return self._array.size
+
     def __eq__(self, other):
         """
         Return wether self is identical to other
         """
         self.checkCompatibility(other)
 
-        return (len(self) - np.sum(self._array == other._array))==0
+        if not (self._isTidy and other._isTidy):
+            raise Exception('cannot compare QFloats that are not tidy')        
 
+        return (len(self) - np.sum(self._array == other._array))==0
 
     def __lt__(self, other):
         """ Computes wether an array is lower than another
@@ -235,6 +285,9 @@ class QFloat():
         """     
         self.checkCompatibility(other)
 
+        if not (self._isTidy and other._isTidy):
+            raise Exception('cannot compare QFloats that are not tidy')
+
         n = len(self)
 
         A=self._array  # doesn't copy array, just for naming clarity
@@ -263,10 +316,6 @@ class QFloat():
         ## return wether or_array is true for all indices
         return (n - np.sum(or_array))==0
 
-    def __len__(self):
-        """Return the length of the sequence."""
-        return self._array.size
-
     def __getitem__(self, index):
         """Return a subsequence as a single integer or as a sequence object.
         """
@@ -280,14 +329,20 @@ class QFloat():
     def __add__(self, other):
         """
         Sum with another QFLoat
+        Summing will potentially make values in the sum array be greater than the base, so tidy becomes False
         """
         self.checkCompatibility(other)
-        return QFloat(self._array + other._array, self._ints, self._base)
+        addition = QFloat(self._array + other._array, self._ints, self._base)
+        addition._isTidy = False
+        return addition
 
     def __sub__(self, other):
         """
         Subtract another QFLoat
+        Subtracting will potentially make values in the sum array be greater than the base, so tidy becomes False
         """
         self.checkCompatibility(other)
-        return QFloat(self._array - other._array, self._ints, self._base)
+        subtraction = QFloat(self._array - other._array, self._ints, self._base)
+        subtraction._isTidy = False
+        return subtraction
 
