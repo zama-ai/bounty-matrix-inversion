@@ -53,7 +53,7 @@ def float_to_base_p(f, precision, p):
 
 def base_p_subtraction(a, b, p):
     """
-    Subtract arrays in base p. a and b must be postive with a > b
+    Subtract arrays in base p. (a and b must be tidy, postive with a > b)
     """
     difference = fhe.zeros(a.size)
     borrow = 0
@@ -66,18 +66,21 @@ def base_p_subtraction(a, b, p):
     return difference
 
 
-class _QFloatAbstractBaseClass():
+class QFloat():
     """
-    An abstract base class of quantized floats. All functions are FHE compatible
+    A class of quantized floats
     """
 
     def __init__(self, array, ints=None, base=2, isTidy=True):
         """
+        array can be encrypted or not
         ints gives the number of digits before the dot.
         ints = 1 will encode number like x.xxxx...
         """
         if not (isinstance(array, np.ndarray) or isinstance(array, fhe.tracing.tracer.Tracer)):
             raise ValueError('array must be np.ndarray or fhe.tracing.tracer.Tracer')
+
+        self._encrypted = isinstance(array, fhe.tracing.tracer.Tracer)
 
         if len(array.shape) > 1:
             raise ValueError('array must be one dimension')
@@ -94,7 +97,99 @@ class _QFloatAbstractBaseClass():
         self._ints = ints
         self._isTidy = isTidy # wether array is tidy (with mixed signs or with abs values >= base)
         self._isBaseTidy = isTidy # wether array is tidy for values (abs values >= base) but signs can be mixed
+        self._sign=None # computed sign
 
+    def _checkUnencrypted(self):
+        if self._encrypted:
+            raise Exception("This function does not work on encrypted QFloats")
+
+    ########################################################################################################################
+    #                                    Functions for unencrypted QFloats only
+    ########################################################################################################################
+
+    def toStr(self, tidy=True):
+        """
+        Convert the QFloat to a string
+
+        WARNING : does not work on encrypted QFLoat
+        """
+        self._checkUnencrypted()
+
+        if tidy: # tidy before return the representation
+            self.tidy()
+            sgn = self.getSign()
+
+            integerPart = (sgn*self._array[0:self._ints]).astype('int')
+            floatPart = (sgn*self._array[self._ints:]).astype('int')
+
+            if self._base <= 10:
+                integerPart = ''.join([str(i) for i in integerPart])
+                floatPart = ''.join([str(i) for i in floatPart])
+            else:
+                integerPart = str(integerPart)
+                floatPart = str(floatPart)
+
+            sgnstr = '' if sgn >=0 else '-'
+
+            return sgnstr+integerPart+'.'+floatPart
+
+        else: # return the untidy representation
+
+            integerPart = self._array[0:self._ints].astype('int')
+            floatPart = self._array[self._ints:].astype('int')
+
+            integerPart = ''.join([str(i) for i in integerPart])
+            floatPart = ''.join([str(i) for i in floatPart])
+
+            return integerPart+'.'+floatPart
+
+    def __str__(self):
+        """
+        Convert the QFloat to a tidy string
+
+        WARNING : does not work on encrypted QFLoat
+        """
+        return self.toStr(True)   
+
+
+    def fromFloat(f, length=10, ints=None, base=2):
+        """
+        Create a QFloat from an unencrypted float
+
+        WARNING : will return an unencrypted QFLoat
+        """
+        qf = QFloat.zero(length, ints, base)
+
+        integerPart = int(f)
+        floatPart = f-integerPart
+
+        intArray = int_to_base_p(integerPart, ints, base)
+        floatArray = float_to_base_p(floatPart, length-ints, base)
+
+        qf._array[0:ints] = intArray
+        qf._array[ints:] = floatArray
+
+        return qf
+
+    def toFloat(self):
+        """
+        Create an unencrypted float from the QFloat
+
+        WARNING : does not work on encrypted QFLoat
+        """
+        self._checkUnencrypted()
+
+        integerPart = base_p_to_int(self._array[0:self._ints], self._base)
+        floatPart = base_p_to_float(self._array[self._ints:], self._base)
+
+        return integerPart + floatPart
+
+
+    ########################################################################################################################
+    #                                 Functions for both encrypted or unencrypted QFloats
+    #
+    #                 Function with (self,other) can work for mixed encrypted and unencrypted arrays
+    ########################################################################################################################
 
     def zero(length, ints, base):
         """
@@ -116,7 +211,7 @@ class _QFloatAbstractBaseClass():
     def one(length, ints, base):
         """
         Create a QFloat of 1
-        """
+        """        
         array=fhe.zeros(length)
         array[ints-1] = fhe.ones(1)[0]
         return QFloat(array, ints, base)
@@ -146,17 +241,17 @@ class _QFloatAbstractBaseClass():
         """
         Check wether other has equal encoding
         """
-        if not isinstance(other, QFloat):
+        if not isinstance(other, self.__class__):
             raise ValueError('Object must be a QFloat')
 
         if self._base != other._base:
-            raise ValueError('QFLoat bases are different')
+            raise ValueError( str(self.__class__)+'s bases are different')
 
         if len(self) != len(other):
-            raise ValueError('QFLoat have different length')
+            raise ValueError( str(self.__class__)+'s have different length')
 
         if self._ints != other._ints:
-            raise ValueError('QFLoat have different dot index')        
+            raise ValueError( str(self.__class__)+'s have different dot index')                
 
     def getSign(self):
         """
@@ -166,6 +261,9 @@ class _QFloatAbstractBaseClass():
         When the QFloat is base tidy, its sign is the the same as the sign of first non zero integer
         in its array, or 0 if the array is null
         """
+        if self._sign:
+            return self._sign
+
         self.baseTidy()
 
         # compute array signs and zeros
@@ -181,8 +279,8 @@ class _QFloatAbstractBaseClass():
             sign = change*signs[i] + not_change*sign
             notfound = notfound & not_change
 
+        self._sign = sign # avoid computing is several times
         return sign
-
 
     def baseTidy(self):
         """
@@ -341,117 +439,29 @@ class _QFloatAbstractBaseClass():
         self.checkCompatibility(other)
         return QFloat(self._array - other._array, self._ints, self._base, False)
 
+    # def __mul__(self, other):
+    #     """
+    #     Sum with another QFLoat
+    #     Summing will potentially make values in the sum array be greater than the base, so isTidy becomes False
+    #     """
+    #     self.checkCompatibility(other)
 
-class QFloat(_QFloatAbstractBaseClass):
-    """
-    Non FHE version of QFloats
-    """
+    #     # A QFloat array is made of 4 quarters, two before the dot and two after, with begining indices:
+    #     id1 = 0
+    #     id2 = len(self)//4
+    #     id3 = len(self)//2
+    #     id4 = (3*len(self))//4
 
-    def __init__(self, array, ints=None, base=2, isTidy=True):
-        """
-        ints gives the number of digits before the dot.
-        ints = 1 will encode number like x.xxxx...
-        """
-        if not isinstance(array, np.ndarray):
-            raise ValueError('array must be np.ndarray')
-
-        super().__init__(array, ints, base, isTidy)
-
-    def toStr(self, tidy=True):
-        """
-        Convert the QFloat to a string
-
-        WARNING : does not work in FHE
-        """
-        if tidy: # tidy before return the representation
-            self.tidy()
-            sgn = self.getSign()
-
-            integerPart = (sgn*self._array[0:self._ints]).astype('int')
-            floatPart = (sgn*self._array[self._ints:]).astype('int')
-
-            if self._base <= 10:
-                integerPart = ''.join([str(i) for i in integerPart])
-                floatPart = ''.join([str(i) for i in floatPart])
-            else:
-                integerPart = str(integerPart)
-                floatPart = str(floatPart)
-
-            sgnstr = '' if sgn >=0 else '-'
-
-            return sgnstr+integerPart+'.'+floatPart
-
-        else: # return the untidy representation
-
-            integerPart = self._array[0:self._ints].astype('int')
-            floatPart = self._array[self._ints:].astype('int')
-
-            integerPart = ''.join([str(i) for i in integerPart])
-            floatPart = ''.join([str(i) for i in floatPart])
-
-            return integerPart+'.'+floatPart
-    
-
-    def __str__(self):
-        """
-        Convert the QFloat to a tidy string
-
-        WARNING : does not work in FHE
-        """
-        return self.toStr(True)   
+    #     # The multiplication array will be the sum of (self part 2-3-4)*(other part 1-2) and (self part 1-2-3)*(other part 3)
+    #     # This is to avoid computing values 
+    #     mularray = fhe.zeros()
+        
+    #     if self._sign and other.sign: # avoid computing sign of the product if we already know it
+    #         mul._sign = self._sign*other.sign
+    #     return mul
 
 
-    def fromFloat(f, length=10, ints=None, base=2):
-        """
-        Create a QFloat from a float
+# class PreciseQFloat()
 
-        WARNING : does not work in FHE
-        """
-        qf = QFloat.zero(length, ints, base)
-
-        integerPart = int(f)
-        floatPart = f-integerPart
-
-        intArray = int_to_base_p(integerPart, ints, base)
-        floatArray = float_to_base_p(floatPart, length-ints, base)
-
-        qf._array[0:ints] = intArray
-        qf._array[ints:] = floatArray
-
-        return qf
-
-    def toFloat(self):
-        """
-        Create a float from the QFloat
-
-        WARNING : does not work in FHE
-        """
-        integerPart = base_p_to_int(self._array[0:self._ints], self._base)
-        floatPart = base_p_to_float(self._array[self._ints:], self._base)
-
-        return integerPart + floatPart
-
-
-class FheQFloat(_QFloatAbstractBaseClass):
-    """
-    FHE version of QFloats
-    """
-    NOT_FHE = Exception("This function does not work in FHE, see QFloat class")
-
-    def __init__(self, array, ints=None, base=2, isTidy=True):
-        if not isinstance(array, fhe.tracing.tracer.Tracer):
-            raise ValueError('array must be fhe.tracing.tracer.Tracer')
-
-        super().__init__(array, ints, base, isTidy)
-
-    def toStr(self, tidy=True):
-        raise FheQFloat.NOT_FHE    
-
-    def __str__(self, ):
-        raise FheQFloat.NOT_FHE
-
-    def fromFloat(f, length=10, ints=None, base=2):
-        raise FheQFloat.NOT_FHE
-
-    def toFloat(self):
-        raise FheQFloat.NOT_FHE
+#     def __mul__(self, other):
+#         #return a result with bigger length thatn self and other to preven overflow
