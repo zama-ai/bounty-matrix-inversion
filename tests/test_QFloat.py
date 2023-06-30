@@ -52,20 +52,12 @@ floatLenght = 8
 class TestQFloat(unittest.TestCase):
 
 
+
+ #########################  NON FHE TESTS #########################
+
     def test_conversion_np(self):
 
         # test conversion from float to QFloat and vice-versa
-
-        # positive value:
-        qf = QFloat.fromFloat(13.75, 10, 5, 2)
-        assert(str(qf)=='01101.11000')
-        assert(qf.toFloat()==13.75)
-
-        # negative value
-        qf = QFloat.fromFloat(-13.75, 10, 5, 2)
-        assert(str(qf)=='0-1-10-1.-1-1000')
-        assert(qf.toFloat()==-13.75)
-
         for i in range(100):
             base = np.random.randint(2,10)
             size = np.random.randint(20,30)
@@ -77,12 +69,41 @@ class TestQFloat(unittest.TestCase):
 
         # mixed values
         qf = QFloat(np.array([0,-1,1,0,1,0]), 3, 2)
-        print(qf.toFloat())
         assert(qf.toFloat()==-0.75)
+
+    def test_str(self):
+        # positive value:
+        qf = QFloat.fromFloat(13.75, 10, 5, 2)
+        assert(str(qf)=='01101.11000')
+
+        # negative value
+        qf = QFloat.fromFloat(-13.75, 10, 5, 2)
+        assert(str(qf)=='-01101.11000')
+
+        #zero
+        qf = QFloat.fromFloat(0, 10, 5, 2)
+        assert(str(qf)=='00000.00000')
+
+
+    def test_getSign(self):
+        # zero
+        f = 0
+        qf = QFloat.fromFloat(f, 10, 5, 2)
+        if not ( qf.getSign() == np.sign(f) ):
+            raise ValueError( 'Wrong sign for QFloat: ' + str(qf) + ' for float: ' + str(f))        
+
+        # non zero
+        for i in range(100):
+            base = np.random.randint(2,10)
+            size = np.random.randint(20,30)
+            ints = np.random.randint(8,12)
+            f = (np.random.randint(0,20000)-10000)/100 # float of type (+/-)xx.xx
+            qf = QFloat.fromFloat(f, size, ints, base)
+            if not ( qf.getSign() == np.sign(f) ):
+                raise ValueError( 'Wrong sign for QFloat: ' + str(qf) + ' for float: ' + str(f))
 
 
     def test_operands_np(self):
-        
         # test add and sub
         for i in range(100):
             base = np.random.randint(2,10)
@@ -96,6 +117,27 @@ class TestQFloat(unittest.TestCase):
             assert( (qf1-qf2).toFloat()-(f1-f2) < 0.1 )
 
 
+    def test_tidy(self):
+        # mixed signs
+
+        for i in range(100):
+            base = np.random.randint(2,10)
+            size = np.random.randint(20,30)
+            ints = np.random.randint(size//2-2,size//2+2)
+            arr = np.zeros(size)
+            i1 = len(arr)//4
+            i2 = 3*i1
+            arr[i1:i2] = np.random.randint(-4*base,4*base, i2-i1)
+            qf = QFloat(arr, ints, base, False)            
+            f = qf.toFloat()
+            qf.tidy()
+            if not ( qf.toFloat() == f ):
+                raise ValueError( 'Wrong tidy value for QFloat: ' + str(qf))
+
+
+
+######################### FHE TESTS #########################
+
     # def test_operands(self):
     #     circuit = QFloatCircuit(6, base, SIMULATE)
 
@@ -103,7 +145,7 @@ class TestQFloat(unittest.TestCase):
     #     assert( circuit.run(seq1, seq1) )
 
 
-#unittest.main()
+unittest.main()
 
-suite = unittest.TestLoader().loadTestsFromName('test_QFloat.TestQFloat.test_operands_np')
-unittest.TextTestRunner(verbosity=1).run(suite)
+# suite = unittest.TestLoader().loadTestsFromName('test_QFloat.TestQFloat.test_tidy')
+# unittest.TextTestRunner(verbosity=1).run(suite)
