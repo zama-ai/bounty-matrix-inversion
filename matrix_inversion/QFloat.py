@@ -2,9 +2,14 @@ import numpy as np
 from concrete import fhe
 
 
+########################################################################################################################
+#                                    Functions operating on arrays in base p
+########################################################################################################################
+
 def base_p_to_int(arr, p):
     """
     Convert base p array to int
+    Can be signed (+/- values)
     """
     # Flip the array to have least significant bit at the start
     arr = np.flip(arr)
@@ -14,6 +19,10 @@ def base_p_to_int(arr, p):
     return np.sum(arr * place_values)
 
 def int_to_base_p(integer, n, p):
+    """
+    Convert a base-p array to a float of the form 0.xxx..
+    Can be signed (+/- values)
+    """    
     # Convert the integer to a base p string
     base_p_string= np.base_repr(np.abs(integer), p)
     # Prepend zeros to the binary representation until it reaches the desired size
@@ -25,6 +34,7 @@ def int_to_base_p(integer, n, p):
 def base_p_to_float(arr, p):
     """
     Convert a base-p array to a float of the form 0.xxx..
+    Can be signed (+/- values)
     """
     f = 0.0
     for i in range(len(arr)):
@@ -34,6 +44,7 @@ def base_p_to_float(arr, p):
 def float_to_base_p(f, precision, p):
     """
     Convert a float of type 0.xxx.. to a base-p array with a given precision.
+    Can be signed (+/- values)
     """
     sgn = np.sign(f)
     f=np.abs(f)
@@ -66,16 +77,20 @@ def base_p_subtraction(a, b, p):
     return difference
 
 
+
 class QFloat():
     """
     A class of quantized floats
     """
+    KEEP_TIDY=True
+    # keepTidy: wether to keep arrays tidy at all time. Setting to False can save time
 
     def __init__(self, array, ints=None, base=2, isTidy=True):
         """
         array can be encrypted or not
         ints gives the number of digits before the dot.
         ints = 1 will encode number like x.xxxx...
+        isTidy: wether the array is already tidy
         """
         if not (isinstance(array, np.ndarray) or isinstance(array, fhe.tracing.tracer.Tracer)):
             raise ValueError('array must be np.ndarray or fhe.tracing.tracer.Tracer')
@@ -98,6 +113,9 @@ class QFloat():
         self._isTidy = isTidy # wether array is tidy (with mixed signs or with abs values >= base)
         self._isBaseTidy = isTidy # wether array is tidy for values (abs values >= base) but signs can be mixed
         self._sign=None # computed sign
+
+        if not isTidy and QFloat.KEEP_TIDY:
+            self.tidy()
 
     def _checkUnencrypted(self):
         if self._encrypted:
@@ -242,7 +260,7 @@ class QFloat():
         Check wether other has equal encoding
         """
         if not isinstance(other, self.__class__):
-            raise ValueError('Object must be a QFloat')
+            raise ValueError('Object must also be a ' + str(self.__class__))
 
         if self._base != other._base:
             raise ValueError( str(self.__class__)+'s bases are different')
@@ -426,39 +444,57 @@ class QFloat():
     def __add__(self, other):
         """
         Sum with another QFLoat
-        Summing will potentially make values in the sum array be greater than the base, so isTidy becomes False
+        Summing will potentially make values in the sum array be greater than the base and not tidy, so isTidy becomes False
+        Hence we need to tidy the sum if requested
         """
         self.checkCompatibility(other)
-        return QFloat(self._array + other._array, self._ints, self._base, False)
+        addition = QFloat(self._array + other._array, self._ints, self._base, False)
+        if QFloat.KEEP_TIDY:
+            addition.tidy()
+        return addition
 
     def __sub__(self, other):
         """
         Subtract another QFLoat
-        Subtracting will potentially make values in the sum array be greater than the base, so isTidy becomes False
+        Subtracting will potentially make values in the sum array be greater than the base and not tidy, so isTidy becomes False
+        Hence we need to tidy the subtraction if requested
         """
         self.checkCompatibility(other)
-        return QFloat(self._array - other._array, self._ints, self._base, False)
+        subtraction = QFloat(self._array - other._array, self._ints, self._base, False)
+        if QFloat.KEEP_TIDY:
+            subtraction.tidy()
+        return subtraction
 
-    # def __mul__(self, other):
-    #     """
-    #     Sum with another QFLoat
-    #     Summing will potentially make values in the sum array be greater than the base, so isTidy becomes False
-    #     """
-    #     self.checkCompatibility(other)
+    def __mul__(self, other):
+        """
+        Sum with another QFLoat
+        Multiplying will potentially make values in the sum array be greater than the base and not tidy, so isTidy becomes False
+        Hence we need to tidy the multiplication if requested
 
-    #     # A QFloat array is made of 4 quarters, two before the dot and two after, with begining indices:
-    #     id1 = 0
-    #     id2 = len(self)//4
-    #     id3 = len(self)//2
-    #     id4 = (3*len(self))//4
+        WARNING: precision of multiplication does not increase, so it may overflow if not enough
+        """
+        self.checkCompatibility(other)
 
-    #     # The multiplication array will be the sum of (self part 2-3-4)*(other part 1-2) and (self part 1-2-3)*(other part 3)
-    #     # This is to avoid computing values 
-    #     mularray = fhe.zeros()
-        
-    #     if self._sign and other.sign: # avoid computing sign of the product if we already know it
-    #         mul._sign = self._sign*other.sign
-    #     return mul
+        # A QFloat array is made of 2 parts, integer part and float part
+        # The multiplication array will be the sum of integer * other + float * other
+        n=len(self)
+        mularray = fhe.zeros((n, n))
+        # integer part, shift  to the left
+        for i in range(0,self._ints):
+            mularray[i, 0:n-(self._ints-1-i)] = self._array[i]*other._array[self._ints-1-i:]
+        # float part, shift to the right
+        for i in range(self._ints,n):
+            mularray[i, 1+i-self._ints:] = self._array[i]*other._array[0:n-(i-self._ints)-1]
+
+        # the multiplication array is made from the sum of the muarray rows
+        multiplication = QFloat(np.sum(mularray, axis=0), self._ints, self._base, False)
+
+        if self._sign and other._sign: # avoid computing sign of the product if we already know it
+            multiplication._sign = self._sign*other._sign
+
+        if QFloat.KEEP_TIDY:
+            multiplication.tidy()
+        return multiplication
 
 
 # class PreciseQFloat()

@@ -48,6 +48,7 @@ class QFloatCircuit:
 SIMULATE=False
 base=2
 floatLenght = 8
+QFloat.KEEP_TIDY=False
 
 class TestQFloat(unittest.TestCase):
 
@@ -85,7 +86,7 @@ class TestQFloat(unittest.TestCase):
         assert(str(qf)=='00000.00000')
 
 
-    def test_getSign(self):
+    def test_getSign_np(self):
         # zero
         f = 0
         qf = QFloat.fromFloat(f, 10, 5, 2)
@@ -103,7 +104,7 @@ class TestQFloat(unittest.TestCase):
                 raise ValueError( 'Wrong sign for QFloat: ' + str(qf) + ' for float: ' + str(f))
 
 
-    def test_operands_np(self):
+    def test_add_sub_np(self):
         # test add and sub
         for i in range(100):
             base = np.random.randint(2,10)
@@ -116,8 +117,21 @@ class TestQFloat(unittest.TestCase):
             assert( (qf1+qf2).toFloat()-(f1+f2) < 0.1 )
             assert( (qf1-qf2).toFloat()-(f1-f2) < 0.1 )
 
+    def test_mul_np(self):
+        # test mul
+        for i in range(100):
+            base = np.random.randint(2,3)
+            size = np.random.randint(30,40)
+            ints = np.random.randint(10,13)
+            f1 = (np.random.randint(0,200)-100)/10 # float of type (+/-)x.x
+            f2 = (np.random.randint(0,200)-100)/10 # float of type (+/-)x.x
+            qf1 = QFloat.fromFloat(f1, size, ints, base)
+            qf2 = QFloat.fromFloat(f2, size, ints, base)
+            prod = qf1*qf2
+            assert( prod.toFloat()-(f1*f2) < 0.1 )
 
-    def test_tidy(self):
+
+    def test_tidy_np(self):
         # mixed signs
 
         for i in range(100):
@@ -145,7 +159,7 @@ class TestQFloat(unittest.TestCase):
     #     assert( circuit.run(seq1, seq1) )
 
 
-unittest.main()
+#unittest.main()
 
-# suite = unittest.TestLoader().loadTestsFromName('test_QFloat.TestQFloat.test_tidy')
-# unittest.TextTestRunner(verbosity=1).run(suite)
+suite = unittest.TestLoader().loadTestsFromName('test_QFloat.TestQFloat.test_mul_np')
+unittest.TextTestRunner(verbosity=1).run(suite)
