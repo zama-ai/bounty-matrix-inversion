@@ -76,6 +76,61 @@ def base_p_subtraction(a, b, p):
         difference[i] = temp
     return difference
 
+def base_p_division(dividend, divisor, p):
+    """
+    Divide arrays in base p. (dividend and divisor must be tidy, postive with a > b)
+    """    
+    # Initialize the quotient array
+    quotient = fhe.zeros(dividend.size)
+    # Initialize the remainder
+    remainder = fhe.zeros(divisor.size)
+
+    for i in range(len(dividend)):
+        # Left-roll the remainder
+        remainder = np.roll(remainder, -1)
+        # Bring down the next bit from the dividend
+        remainder[-1] = dividend[i]
+        # If the remainder is larger than or equal to the divisor
+        for j in range(p-1):
+            if is_greater_or_equal(remainder, divisor):
+                # Subtract the divisor from the remainder
+                remainder = base_p_subtraction(remainder, divisor, p)
+                # Set the current quotient bit to 1
+                quotient[i] += 1
+
+    return quotient
+
+def is_greater_or_equal(A, B):
+    """
+    Computes wether an array is greater or equal than another, in alphabetical order
+
+    An array A is greater or equal than an array B if and only if:
+    for all index i:  either  A[i] >= B[i]  or  there is an index k<i where A[k] > B[k]
+    """    
+    n = A.size
+
+    ## compute A[i] >= B[i] array
+    ge_array = A >= B
+    
+    ## compute A[i] > B[i] array
+    gt_array = A > B 
+
+    ## compute "there is an index k<i where A[i] > B[i]" array in cum_gt_array:
+    # if gt_array[k] is 1 for some k, cum_gt_array[i] will be 1 for all i>k
+    cum_gt_array = fhe.zeros(n)
+    if n >1:
+        cum_gt_array[1] = gt_array[0]
+    else:
+        return ge_array[0] # special case if array has size one
+
+    for i in range(2,n):
+        cum_gt_array[i] = cum_gt_array[i-1] | gt_array[i-1]
+
+    ## now compute " A[i] >= B[i]  or  there is an index k<i where A[i] > B[i] " array in or_array:
+    or_array = ge_array | cum_gt_array
+
+    ## return wether or_array is true for all indices
+    return (n - np.sum(or_array))==0
 
 
 class QFloat():
@@ -395,41 +450,13 @@ class QFloat():
 
         An array A is greater or equal than an array B if and only if:
         for all index i:  either  A[i] >= B[i]  or  there is an index k<i where A[k] > B[k]
-
-        If array have different length, the shorter one is considered to have extra extra -np.inf values
         """     
         self.checkCompatibility(other)
 
         self.tidy()
         other.tidy()
 
-        n = len(self)
-
-        A=self._array  # doesn't copy array, just for naming clarity
-        B=other._array # doesn't copy array, just for naming clarity
-
-        ## compute A[i] >= B[i] array
-        ge_array = A >= B
-        
-        ## compute A[i] > B[i] array
-        gt_array = A > B 
-
-        ## compute "there is an index k<i where A[i] > B[i]" array in cum_gt_array:
-        # if gt_array[k] is 1 for some k, cum_gt_array[i] will be 1 for all i>k
-        cum_gt_array = fhe.zeros(n)
-        if n >1:
-            cum_gt_array[1] = gt_array[0]
-        else:
-            return ge_array[0] # special case if array has size one
-
-        for i in range(2,n):
-            cum_gt_array[i] = cum_gt_array[i-1] | gt_array[i-1]
-
-        ## now compute " A[i] >= B[i]  or  there is an index k<i where A[i] > B[i] " array in or_array:
-        or_array = ge_array | cum_gt_array
-
-        ## return wether or_array is true for all indices
-        return (n - np.sum(or_array))==0
+        return is_greater_or_equal(self._array, other._array)
 
     def __getitem__(self, index):
         """Return a subsequence as a single integer or as a sequence object.
@@ -467,7 +494,7 @@ class QFloat():
 
     def __mul__(self, other):
         """
-        Sum with another QFLoat
+        Multiply with another QFLoat
         Multiplying will potentially make values in the sum array be greater than the base and not tidy, so isTidy becomes False
         Hence we need to tidy the multiplication if requested
 
@@ -496,6 +523,40 @@ class QFloat():
             multiplication.tidy()
         return multiplication
 
+
+    def __truediv__(self, other):
+        """
+        Divide by another QFLoat
+        Dividing requires arrays to be tidy and will return a tidy array
+
+        Consider two integers a and b, that we want to divide with float precision fp:
+        We have: (a / b) = (a * fp) / b / fp
+        Where a * fp / b is an integer division, and ((a * fp) / b / fp) is a float number with fp precision
+
+        WARNING: precision of division does not increase
+
+        TODO : maybe optimize by stopping division earlier to account for shift ?
+        """
+        self.checkCompatibility(other)
+        self.tidy()
+        other.tidy()
+
+        # The float precision is the number of digits after the dot:
+        fp = len(self)-self._ints
+
+        # We consider each array as representing integers a and b here
+        # Let's left shit the first array which corresponds by multiplying a by fp:
+        shift_arr = np.concatenate((self._array, fhe.zeros(fp)), axis=0)
+        # Make the integer division (a*fp)/b with our long division algorithm:
+        div_array = base_p_division(shift_arr, other._array, self._base)
+        # The result array encodes for a QFloat with fp precision, which is equivalent to divide the result by fp
+        # giving as expected the number (a * fp) / b / fp :
+        division = QFloat(div_array[fp:], self._ints, self._base, False)
+
+        # if self._sign and other._sign: # avoid computing sign of the product if we already know it
+        #     division._sign = self._sign*other._sign
+
+        return division
 
 # class PreciseQFloat()
 
