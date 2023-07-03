@@ -133,33 +133,16 @@ class TestQFloat(unittest.TestCase):
 
     def test_div_np(self):
 
-        base = 2
-        size = 20
-        ints = 7
-        f1 = (np.random.randint(0,200))/10 # float of type (+/-)x.x
-        f2 = (np.random.randint(0,200))/10 # float of type (+/-)x.x
-        qf1 = QFloat.fromFloat(f1, size, ints, base)
-        qf2 = QFloat.fromFloat(f2, size, ints, base)
-        div = qf1/qf2
-        print(f1, f2)
-        print(div.toFloat(), (f1/f2))
-        print(str(qf1))
-        print(str(qf2))
-        print(str(div))
-        print(" ")
-        assert( div.toFloat()-(f1/f2) < 0.1 )
-
-        # test div
-        # for i in range(100):
-        #     base = np.random.randint(2,3)
-        #     size = np.random.randint(30,40)
-        #     ints = np.random.randint(10,13)
-        #     f1 = (np.random.randint(0,200)-100)/10 # float of type (+/-)x.x
-        #     f2 = (np.random.randint(0,200)-100)/10 # float of type (+/-)x.x
-        #     qf1 = QFloat.fromFloat(f1, size, ints, base)
-        #     qf2 = QFloat.fromFloat(f2, size, ints, base)
-        #     div = qf1/qf2
-        #     assert( div.toFloat()-(f1/f2) < 0.1 )
+        for i in range(100):
+            base = np.random.randint(2,3)
+            size = np.random.randint(30,40)
+            ints = np.random.randint(10,13)
+            f1 = (np.random.randint(0,200)-100)/10 # float of type (+/-)x.x
+            f2 = (np.random.randint(0,200)-100)/10 # float of type (+/-)x.x
+            qf1 = QFloat.fromFloat(f1, size, ints, base)
+            qf2 = QFloat.fromFloat(f2, size, ints, base)
+            div = qf1/qf2
+            assert( div.toFloat()-(f1/f2) < 0.1 )
 
 
     def test_tidy_np(self):

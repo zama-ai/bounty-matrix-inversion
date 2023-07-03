@@ -541,17 +541,24 @@ class QFloat():
         self.tidy()
         other.tidy()
 
+        # get signs and make arrays positive
+        sgna = self.getSign()
+        a = sgna*(self._array)
+
+        sgnb = other.getSign()
+        b = sgnb*(other._array)        
+
         # The float precision is the number of digits after the dot:
         fp = len(self)-self._ints
 
         # We consider each array as representing integers a and b here
         # Let's left shit the first array which corresponds by multiplying a by fp:
-        shift_arr = np.concatenate((self._array, fhe.zeros(fp)), axis=0)
+        shift_arr = np.concatenate((a, fhe.zeros(fp)), axis=0)
         # Make the integer division (a*fp)/b with our long division algorithm:
-        div_array = base_p_division(shift_arr, other._array, self._base)
+        div_array = base_p_division(shift_arr, b, self._base)
         # The result array encodes for a QFloat with fp precision, which is equivalent to divide the result by fp
         # giving as expected the number (a * fp) / b / fp :
-        division = QFloat(div_array[fp:], self._ints, self._base, False)
+        division = QFloat(div_array[fp:]*sgna*sgnb, self._ints, self._base, False)
 
         # if self._sign and other._sign: # avoid computing sign of the product if we already know it
         #     division._sign = self._sign*other._sign
