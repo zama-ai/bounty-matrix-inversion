@@ -146,7 +146,7 @@ class QFloat():
     KEEP_TIDY=True
     # keepTidy: wether to keep arrays tidy at all time. Setting to False can save time
 
-    def __init__(self, array, ints=None, base=2, isTidy=True):
+    def __init__(self, array, ints=None, base=2, isTidy=True, sign=None):
         """
         array can be encrypted or not
         ints gives the number of digits before the dot.
@@ -173,7 +173,7 @@ class QFloat():
         self._ints = ints
         self._isTidy = isTidy # wether array is tidy (with mixed signs or with abs values >= base)
         self._isBaseTidy = isTidy # wether array is tidy for values (abs values >= base) but signs can be mixed
-        self._sign = None # computed sign
+        self._sign = sign # sign if known
 
         if not isTidy and QFloat.KEEP_TIDY:
             self.tidy()
@@ -237,7 +237,8 @@ class QFloat():
 
         WARNING : will return an unencrypted QFLoat
         """
-        qf = QFloat.zero(length, ints, base)
+        if not ints:
+            ints = length//2
 
         integerPart = int(f)
         floatPart = f-integerPart
@@ -245,10 +246,11 @@ class QFloat():
         intArray = int_to_base_p(integerPart, ints, base)
         floatArray = float_to_base_p(floatPart, length-ints, base)
 
-        qf._array[0:ints] = intArray
-        qf._array[ints:] = floatArray
+        array = fhe.zeros(length)
+        array[0:ints] = intArray
+        array[ints:] = floatArray
 
-        return qf
+        return QFloat(array, ints, base, True, np.sign(f))
 
     def toFloat(self):
         """
@@ -276,7 +278,7 @@ class QFloat():
         """
         if not (isinstance(length, int) and length > 0):
             raise ValueError('length must be a positive int')
-        return QFloat(fhe.zeros(length), ints, base)
+        return QFloat(fhe.zeros(length), ints, base, True, fhe.zeros(1)[0])
 
     def zero_like(other):
         """
@@ -285,7 +287,7 @@ class QFloat():
         if not isinstance(other, QFloat):
             raise ValueError('Object must be a QFloat')
 
-        return QFloat.zero(len(other), other._ints, other._base)
+        return QFloat.zero(len(other), other._ints, other._base, )
 
     def one(length, ints, base):
         """
@@ -293,7 +295,7 @@ class QFloat():
         """        
         array=fhe.zeros(length)
         array[ints-1] = fhe.ones(1)[0]
-        return QFloat(array, ints, base)
+        return QFloat(array, ints, base, True, fhe.ones(1)[0])
 
     def one_like(other):
         """
@@ -308,16 +310,15 @@ class QFloat():
         """
         Create a QFloat copy
         """
-        copy = QFloat(self._array[:], self._ints, self._base, self._isTidy)
+        copy = QFloat(self._array[:], self._ints, self._base, self._isTidy, self._sign)
         copy._isBaseTidy = self._isBaseTidy
-        copy._sign = self._sign
         return copy       
 
     def toArray(self):
         """
         Rerturn copy of array
         """
-        return self._array[:]
+        return np.copy(self._array)
 
     def checkCompatibility(self, other):
         """
@@ -503,34 +504,46 @@ class QFloat():
 
     def __mul__(self, other):
         """
-        Multiply with another QFLoat
+        Multiply with another QFLoat or integer
         Multiplying will potentially make values in the sum array be greater than the base and not tidy, so isTidy becomes False
         Hence we need to tidy the multiplication if requested
 
         WARNING: precision of multiplication does not increase, so it may overflow if not enough
         """
-        self.checkCompatibility(other)
 
-        # A QFloat array is made of 2 parts, integer part and float part
-        # The multiplication array will be the sum of integer * other + float * other
-        n=len(self)
-        mularray = fhe.zeros((n, n))
-        # integer part, shift  to the left
-        for i in range(0,self._ints):
-            mularray[i, 0:n-(self._ints-1-i)] = self._array[i]*other._array[self._ints-1-i:]
-        # float part, shift to the right
-        for i in range(self._ints,n):
-            mularray[i, 1+i-self._ints:] = self._array[i]*other._array[0:n-(i-self._ints)-1]
+        if isinstance(other, fhe.tracing.tracer.Tracer) or isinstance(other, numbers.Integral):
+            # multiply everything by a single number
+            multiplication = QFloat( other*self._array, self._ints, self._base, False)        
+        else:
+            # multiply with another compatible QFloat 
+            self.checkCompatibility(other)
 
-        # the multiplication array is made from the sum of the muarray rows
-        multiplication = QFloat(np.sum(mularray, axis=0), self._ints, self._base, False)
+            # A QFloat array is made of 2 parts, integer part and float part
+            # The multiplication array will be the sum of integer * other + float * other
+            n=len(self)
+            mularray = fhe.zeros((n, n))
+            # integer part, shift  to the left
+            for i in range(0,self._ints):
+                mularray[i, 0:n-(self._ints-1-i)] = self._array[i]*other._array[self._ints-1-i:]
+            # float part, shift to the right
+            for i in range(self._ints,n):
+                mularray[i, 1+i-self._ints:] = self._array[i]*other._array[0:n-(i-self._ints)-1]
 
-        if self._sign and other._sign: # avoid computing sign of the product if we already know it
-            multiplication._sign = self._sign*other._sign
+            # the multiplication array is made from the sum of the muarray rows
+            multiplication = QFloat(np.sum(mularray, axis=0), self._ints, self._base, False)
+
+            if self._sign and other._sign: # avoid computing sign of the sign if we already know it
+                multiplication._sign = self._sign*other._sign
 
         if QFloat.KEEP_TIDY:
             multiplication.tidy()
         return multiplication
+
+    def __rmul__(self, other):
+        """
+        Multiply with other object on the right
+        """
+        return self.__mul__(other)
 
     def __truediv__(self, other):
         """
@@ -565,7 +578,7 @@ class QFloat():
         div_array = base_p_division(shift_arr, b, self._base)
         # The result array encodes for a QFloat with fp precision, which is equivalent to divide the result by fp
         # giving as expected the number (a * fp) / b / fp :
-        division = QFloat(div_array[fp:]*sgna*sgnb, self._ints, self._base, False)
+        division = QFloat(div_array[fp:]*sgna*sgnb, self._ints, self._base, True, signa*signb) # result is tidy and signed
 
         return division
 
