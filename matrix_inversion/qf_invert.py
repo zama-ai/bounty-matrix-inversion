@@ -4,7 +4,6 @@ import time
 from QFloat import QFloat
 from concrete import fhe
 
-#transpose = [list(row) for row in zip(*matrix)]
 
 
 
@@ -111,8 +110,10 @@ def qf_pivot_matrix(M):
 
 #### INITIAL FUNCTION  ####################################################################
 def lu_decomposition(M):
-    """Performs an LU Decomposition of M (which must be square)
-    into PM = LU. The function returns P, L, and U."""
+    """
+    Performs an LU Decomposition of M (which must be square)
+    into PM = LU. The function returns P, L, and U.
+    """
     assert(M.shape[0]==M.shape[1])
     n = M.shape[0]
 
@@ -148,6 +149,94 @@ def lu_decomposition(M):
 
 
 
+def qf_list_dot_product(list1, list2, qf0):
+    """
+    Dot product of two QFloat lists
+    """
+    if len(list1) != len(list2):
+        raise ValueError("Lists should have the same length.")
+    
+    result = qf0.copy() # copy the zero QFloat for initialization
+
+    for i in range(len(list1)):
+        if isinstance(list1[i], fhe.tracing.tracer.Tracer): # multiply a QFloat with a Tracer, not the opposite
+            result += list2[i] * list1[i] # in place addition is supported    
+        else:
+            result += list1[i] * list2[i] # in place addition is supported
+    
+    return result
+
+def qf_list_matrix_multiply(matrix1, matrix2, qf0):
+    """
+    Multiply two matrices of int or QFloats
+    """
+    # if len(matrix1[0]) != len(matrix2):
+    #     raise ValueError("Number of columns in matrix1 should match the number of rows in matrix2.")
+    result = [[None] * len(matrix2[0]) for _ in range(len(matrix1))]
+
+    for i in range(len(matrix1)):
+        for j in range(len(matrix2[0])):
+            result[i][j] = qf_list_dot_product( matrix1[i][:], matrix2[:][j] , qf0)
+    
+    return result
+
+def transpose_2DList(list2D):
+    """
+    Transpose a 2D-list matrix
+    """
+    return [list(row) for row in zip(*list2D)]
+
+def qf_lu_decomposition(M, qf_len, qf_ints, qf_base):
+    """
+    Performs an LU Decomposition of square QFloats 2D-list matrix M
+    The function returns P, L, and U such that M = PLU. 
+    """
+    assert(len(M)==len(M[0]))
+    assert(qf_len==len(M[0][0]))
+    n = len(M)
+
+    # add __len__ function to fhe.tracing.tracer.Tracer for simplicity:
+    def arrlen(self):
+        return self.shape[0]
+    fhe.tracing.tracer.Tracer.__len__ = arrlen
+
+    qf0 = QFloat.zero(qf_len, qf_ints, qf_base) # a zero QFloat with good format
+
+    # Initialize 2D-list matrices for L and U
+    # (QFloats can be multiplied with integers, this saves computations)
+    L = np.identity(n, dtype='int').tolist()
+    U = np.zeros((n,n), dtype='int').tolist()
+
+    # Create the pivot matrix P and the multiplied matrix PM
+    P = qf_pivot_matrix(M)
+    PM = qf_list_matrix_multiply(P, M, qf0)
+
+    # Perform the LU Decomposition
+    for j in range(n):
+        # u_{ij} = a_{ij} - \sum_{k=1}^{i-1} u_{kj} l_{ik}
+        for i in range(j+1):
+            if i>0:
+                s1 = qf_list_dot_product([U[k][j] for k in range(0,i)], [ L[i][k] for k in range(0,i) ], qf0)
+                U[i][j] = PM[i][j] - s1
+            else:
+                U[i][j] = PM[i][j]
+
+        # l_{ij} = \frac{1}{u_{jj}} (a_{ij} - \sum_{k=1}^{j-1} u_{kj} l_{ik})
+        for i in range(j, n):
+            if j>0:
+                s2 = qf_list_dot_product([U[k][j] for k in range(0,j)], [L[i][k] for k in range(0,j)], qf0)
+                L[i][j] = (PM[i][j] - s2) / U[j][j]
+            else:
+                L[i][j] = PM[i][j] / U[j][j]
+
+    # PM = LU
+    P= transpose_2DList(P)
+
+    # now M = PLU
+    return P, L, U
+
+
+
 
 
 ########################################################################################
@@ -164,14 +253,14 @@ def lu_inverse(P, L, U):
     for i in range(n):
         Y[i, 0] = P[i, 0] / L[0, 0]
         for j in range(1, n):
-            Y[i, j] = (P[i, j] - np.dot(L[j, :j], Y[i, :j])) / L[j, j]
+            Y[i][j] = (P[i][j] - np.dot(L[j][:j], Y[i][:j])) / L[j][j]
 
     # Backward substitution: Solve U * X = Y for X
     X = np.zeros((n, n))
     for i in range(n - 1, -1, -1):
-        X[i, -1] = Y[i, -1] / U[-1, -1]
+        X[i][-1] = Y[i][-1] / U[-1][-1]
         for j in range(n - 2, -1, -1):
-            X[i, j] = (Y[i, j] - np.dot(U[j, j+1:], X[i, j+1:])) / U[j, j]
+            X[i][j] = (Y[i][j] - np.dot(U[j][j+1:], X[i][j+1:])) / U[j][j]
 
     return np.transpose(X)
 
@@ -221,6 +310,23 @@ def qfloat_arrays_to_float_matrix(qf_arrays, qf_signs, qf_ints, qf_base):
 
     return qf_M
 
+def qfloat_matrix_to_arrays(M, qf_len, qf_ints, qf_base):
+    """
+    converts a QFloat 2D-list matrix to integer arrays 
+    """
+    n=len(M)
+    assert(n==len(M[0]))
+    qf_arrays = fhe.zeros((n*n, qf_len))
+    index=0
+    for i in range(n):
+        for j in range(n):
+            if isinstance(M[i][j], QFloat):
+                qf_arrays[index,:] = M[i][j].toArray()
+            else:
+                qf_arrays[index,qf_ints-1] = M[i][j]                
+            index += 1
+
+    return qf_arrays
 
 def fhematrix(qf_arrays, qf_signs, params):
 
@@ -233,9 +339,15 @@ def fhematrix(qf_arrays, qf_signs, params):
     qf_M = qfloat_arrays_to_float_matrix(qf_arrays, qf_signs, qf_ints, qf_base)
 
     # compute the pivot matrix
-    qf_P = qf_pivot_matrix(qf_M)
+    #qf_P = qf_pivot_matrix(qf_M)
 
-    return qf_P
+    # compute the LU decomposition
+    qf_P, qf_L, qf_U = qf_lu_decomposition(qf_M, qf_len, qf_ints, qf_base)
+
+    # break the resulting QFloats into arrays:
+    qf_arrays_out = qfloat_matrix_to_arrays(qf_L, qf_len, qf_ints, qf_base)
+
+    return qf_arrays_out
 
 ########################################################################################
 #                                   TESTS
@@ -312,6 +424,8 @@ def test_qf_fhe(n, simulate=False):
     print("Computing ...", end="", flush=True)
     print("\r", end="")
 
+    #QFloat.KEEP_TIDY=False
+
     # Run FHE
     if not simulate:
         encrypted = measure_time(circuit.encrypt, 'Encrypting', qf_arrays, qf_signs)
@@ -319,6 +433,8 @@ def test_qf_fhe(n, simulate=False):
         decrypted = circuit.decrypt(run)
     else:
         decrypted = measure_time(circuit.simulate,'Simulating', qf_arrays, qf_signs)
+
+    QFloat.KEEP_TIDY=True
 
     print(decrypted)
     print(pivot_matrix(M))
