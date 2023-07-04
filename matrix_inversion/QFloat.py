@@ -162,6 +162,9 @@ class QFloat():
             raise ValueError('array must be one dimension')
         self._array = array[:]
 
+        if not self._encrypted:
+            self._array = self._array.astype(int)
+
         if not (isinstance(base, int) and base > 1):
             raise ValueError('base must be a int >1')
         self._base = base       
@@ -310,7 +313,7 @@ class QFloat():
         """
         Create a QFloat copy
         """
-        copy = QFloat(self._array[:], self._ints, self._base, self._isTidy, self._sign)
+        copy = QFloat(self.toArray(), self._ints, self._base, self._isTidy, self._sign)
         copy._isBaseTidy = self._isBaseTidy
         return copy       
 
@@ -318,7 +321,10 @@ class QFloat():
         """
         Rerturn copy of array
         """
-        return np.copy(self._array)
+        if not self._encrypted:
+            return np.copy(self._array)
+        else:
+            return self._array[:]
 
     def checkCompatibility(self, other):
         """
