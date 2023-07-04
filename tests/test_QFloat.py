@@ -146,6 +146,8 @@ class TestQFloat(unittest.TestCase):
             ints = np.random.randint(10,13)
             f1 = (np.random.randint(0,200)-100)/10 # float of type (+/-)x.x
             f2 = (np.random.randint(0,200)-100)/10 # float of type (+/-)x.x
+            if f2==0:
+                f2+=1.0
             qf1 = QFloat.fromFloat(f1, size, ints, base)
             qf2 = QFloat.fromFloat(f2, size, ints, base)
             div = qf1/qf2

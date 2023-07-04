@@ -93,11 +93,11 @@ def base_p_division(dividend, divisor, p):
         remainder[-1] = dividend[i]
         # If the remainder is larger than or equal to the divisor
         for j in range(p-1):
-            if is_greater_or_equal(remainder, divisor):
-                # Subtract the divisor from the remainder
-                remainder = base_p_subtraction(remainder, divisor, p)
-                # Set the current quotient bit to 1
-                quotient[i] += 1
+            is_ge = is_greater_or_equal(remainder, divisor)
+            # Subtract the divisor from the remainder
+            remainder = is_ge*base_p_subtraction(remainder, divisor, p) + (1-is_ge)*remainder
+            # Set the current quotient bit to 1
+            quotient[i] += is_ge
 
     return quotient
 
