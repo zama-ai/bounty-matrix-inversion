@@ -118,7 +118,7 @@ class TestQFloat(unittest.TestCase):
             assert( (qf1-qf2).toFloat()-(f1-f2) < 0.1 )
 
     def test_mul_np(self):
-        # test mul
+        # test multiplication
         for i in range(100):
             base = np.random.randint(2,3)
             size = np.random.randint(30,40)
@@ -132,7 +132,7 @@ class TestQFloat(unittest.TestCase):
 
 
     def test_div_np(self):
-
+        # test division
         for i in range(100):
             base = np.random.randint(2,3)
             size = np.random.randint(30,40)
@@ -144,10 +144,18 @@ class TestQFloat(unittest.TestCase):
             div = qf1/qf2
             assert( div.toFloat()-(f1/f2) < 0.1 )
 
+    def test_abs_np(self):
+        for i in range(100):
+            base = np.random.randint(2,3)
+            size = np.random.randint(30,40)
+            ints = np.random.randint(10,13)
+            f1 = (np.random.randint(0,200)-100)/10 # float of type (+/-)x.x
+            qf1 = QFloat.fromFloat(f1, size, ints, base)
+            assert( abs(qf1).toFloat()-(abs(f1)) < 0.1 )
+
 
     def test_tidy_np(self):
         # mixed signs
-
         for i in range(100):
             base = np.random.randint(2,10)
             size = np.random.randint(20,30)
@@ -163,7 +171,6 @@ class TestQFloat(unittest.TestCase):
                 raise ValueError( 'Wrong tidy value for QFloat: ' + str(qf))
 
 
-
 ######################### FHE TESTS #########################
 
     # def test_operands(self):
@@ -173,7 +180,7 @@ class TestQFloat(unittest.TestCase):
     #     assert( circuit.run(seq1, seq1) )
 
 
-#unittest.main()
+unittest.main()
 
-suite = unittest.TestLoader().loadTestsFromName('test_QFloat.TestQFloat.test_div_np')
-unittest.TextTestRunner(verbosity=1).run(suite)
+# suite = unittest.TestLoader().loadTestsFromName('test_QFloat.TestQFloat.test_div_np')
+# unittest.TextTestRunner(verbosity=1).run(suite)

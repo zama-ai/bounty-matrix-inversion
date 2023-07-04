@@ -1,10 +1,11 @@
 import numpy as np
+import numbers
 from concrete import fhe
 
 
-########################################################################################################################
+#=======================================================================================================================
 #                                    Functions operating on arrays in base p
-########################################################################################################################
+#=======================================================================================================================
 
 def base_p_to_int(arr, p):
     """
@@ -78,7 +79,7 @@ def base_p_subtraction(a, b, p):
 
 def base_p_division(dividend, divisor, p):
     """
-    Divide arrays in base p. (dividend and divisor must be tidy, postive with a > b)
+    Divide arrays in base p. (dividend and divisor must be tidy and positive)
     """    
     # Initialize the quotient array
     quotient = fhe.zeros(dividend.size)
@@ -133,6 +134,11 @@ def is_greater_or_equal(A, B):
     return (n - np.sum(or_array))==0
 
 
+
+#=======================================================================================================================
+#                                                       QFfloats
+#=======================================================================================================================
+
 class QFloat():
     """
     A class of quantized floats
@@ -167,7 +173,7 @@ class QFloat():
         self._ints = ints
         self._isTidy = isTidy # wether array is tidy (with mixed signs or with abs values >= base)
         self._isBaseTidy = isTidy # wether array is tidy for values (abs values >= base) but signs can be mixed
-        self._sign=None # computed sign
+        self._sign = None # computed sign
 
         if not isTidy and QFloat.KEEP_TIDY:
             self.tidy()
@@ -176,9 +182,9 @@ class QFloat():
         if self._encrypted:
             raise Exception("This function does not work on encrypted QFloats")
 
-    ########################################################################################################################
-    #                                    Functions for unencrypted QFloats only
-    ########################################################################################################################
+    #=============================================================================================
+    #                        Functions for unencrypted QFloats only
+    #=============================================================================================
 
     def toStr(self, tidy=True):
         """
@@ -258,11 +264,11 @@ class QFloat():
         return integerPart + floatPart
 
 
-    ########################################################################################################################
+    #=============================================================================================
     #                                 Functions for both encrypted or unencrypted QFloats
     #
-    #                 Function with (self,other) can work for mixed encrypted and unencrypted arrays
-    ########################################################################################################################
+    #       Function with (self,other) can work for mixed encrypted and unencrypted arrays
+    #=============================================================================================
 
     def zero(length, ints, base):
         """
@@ -302,7 +308,10 @@ class QFloat():
         """
         Create a QFloat copy
         """
-        return self.__class__(self._array[:], self._ints, self._base, self._isTidy)       
+        copy = QFloat(self._array[:], self._ints, self._base, self._isTidy)
+        copy._isBaseTidy = self._isBaseTidy
+        copy._sign = self._sign
+        return copy       
 
     def toArray(self):
         """
@@ -314,17 +323,17 @@ class QFloat():
         """
         Check wether other has equal encoding
         """
-        if not isinstance(other, self.__class__):
-            raise ValueError('Object must also be a ' + str(self.__class__))
+        if not isinstance(other, QFloat):
+            raise ValueError('Object must also be a ' + str(QFloat))
 
         if self._base != other._base:
-            raise ValueError( str(self.__class__)+'s bases are different')
+            raise ValueError( str(QFloat)+'s bases are different')
 
         if len(self) != len(other):
-            raise ValueError( str(self.__class__)+'s have different length')
+            raise ValueError( str(QFloat)+'s have different length')
 
         if self._ints != other._ints:
-            raise ValueError( str(self.__class__)+'s have different dot index')                
+            raise ValueError( str(QFloat)+'s have different dot index')                
 
     def getSign(self):
         """
@@ -458,15 +467,15 @@ class QFloat():
 
         return is_greater_or_equal(self._array, other._array)
 
-    def __getitem__(self, index):
-        """Return a subsequence as a single integer or as a sequence object.
+    def __abs__(self):
         """
-        if isinstance(index, numbers.Integral):
-            # Return a single integer
-            return self._array[index]
-        else:
-            # Return the (sub)sequence as another Seq/MutableSeq object
-            return self.__class__(self._array[index])
+        Returns the absolute value
+        """
+        absval = self.copy()
+        absval.tidy() # need to tidy before computing abs
+        absval._array = np.abs(absval._array)
+        absval._sign = fhe.ones(1)[0]
+        return absval
 
     def __add__(self, other):
         """
@@ -523,7 +532,6 @@ class QFloat():
             multiplication.tidy()
         return multiplication
 
-
     def __truediv__(self, other):
         """
         Divide by another QFLoat
@@ -533,9 +541,8 @@ class QFloat():
         We have: (a / b) = (a * fp) / b / fp
         Where a * fp / b is an integer division, and ((a * fp) / b / fp) is a float number with fp precision
 
+        WARNING: dividing by zero will give zero
         WARNING: precision of division does not increase
-
-        TODO : maybe optimize by stopping division earlier to account for shift ?
         """
         self.checkCompatibility(other)
         self.tidy()
@@ -560,12 +567,11 @@ class QFloat():
         # giving as expected the number (a * fp) / b / fp :
         division = QFloat(div_array[fp:]*sgna*sgnb, self._ints, self._base, False)
 
-        # if self._sign and other._sign: # avoid computing sign of the product if we already know it
-        #     division._sign = self._sign*other._sign
-
         return division
+
 
 # class PreciseQFloat()
 
 #     def __mul__(self, other):
 #         #return a result with bigger length thatn self and other to preven overflow
+
