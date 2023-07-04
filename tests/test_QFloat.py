@@ -116,6 +116,8 @@ class TestQFloat(unittest.TestCase):
             qf2 = QFloat.fromFloat(f2, size, ints, base)
             assert( (qf1+qf2).toFloat()-(f1+f2) < 0.1 )
             assert( (qf1-qf2).toFloat()-(f1-f2) < 0.1 )
+            qf1 += qf2
+            assert( qf1.toFloat()-(f1+f2) < 0.1 ) # iadd
 
     def test_mul_np(self):
         # test multiplication by QFloat and integer
@@ -130,8 +132,10 @@ class TestQFloat(unittest.TestCase):
             qf2 = QFloat.fromFloat(f2, size, ints, base)
             prod = qf1*qf2
             prod2 = integer*qf2
-            assert( prod.toFloat()-(f1*f2) < 0.1 )
-            assert( prod2.toFloat()-(integer*f2) < 0.1 )
+            assert( prod.toFloat()-(f1*f2) < 0.1 ) # mul
+            assert( prod2.toFloat()-(integer*f2) < 0.1 ) # mul
+            qf1 *= qf2
+            assert( qf1.toFloat()-(f1*f2) < 0.1 ) # imul
 
 
     def test_div_np(self):
@@ -185,5 +189,5 @@ class TestQFloat(unittest.TestCase):
 
 #unittest.main()
 
-suite = unittest.TestLoader().loadTestsFromName('test_QFloat.TestQFloat.test_conversion_np')
+suite = unittest.TestLoader().loadTestsFromName('test_QFloat.TestQFloat.test_div_np')
 unittest.TextTestRunner(verbosity=1).run(suite)

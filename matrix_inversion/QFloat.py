@@ -88,7 +88,7 @@ def base_p_division(dividend, divisor, p):
 
     for i in range(len(dividend)):
         # Left-roll the remainder
-        remainder = np.roll(remainder, -1)
+        remainder = np.concatenate((remainder[1:], remainder[0].reshape(1)), axis=0)
         # Bring down the next bit from the dividend
         remainder[-1] = dividend[i]
         # If the remainder is larger than or equal to the divisor
@@ -141,17 +141,18 @@ def is_greater_or_equal(A, B):
 
 class QFloat():
     """
-    A class of quantized floats
+    A class for quantizing floats
     """
-    KEEP_TIDY=True
+
     # keepTidy: wether to keep arrays tidy at all time. Setting to False can save time
+    KEEP_TIDY=True
 
     def __init__(self, array, ints=None, base=2, isTidy=True, sign=None):
         """
-        array can be encrypted or not
-        ints gives the number of digits before the dot.
-        ints = 1 will encode number like x.xxxx...
-        isTidy: wether the array is already tidy
+        - array can be encrypted or not
+        - ints gives the number of digits before the dot, so ints = 1 will encode a number like x.xxxx...
+        - isTidy: wether the array is already tidy
+        - sign: provide the sign if it is already known (usefull in FHE to save computations)
         """
         if not (isinstance(array, np.ndarray) or isinstance(array, fhe.tracing.tracer.Tracer)):
             raise ValueError('array must be np.ndarray or fhe.tracing.tracer.Tracer')
@@ -350,7 +351,7 @@ class QFloat():
         When the QFloat is base tidy, its sign is the the same as the sign of first non zero integer
         in its array, or 0 if the array is null
         """
-        if self._sign:
+        if self._sign is not None:
             return self._sign
 
         self.baseTidy()
@@ -486,15 +487,50 @@ class QFloat():
 
     def __add__(self, other):
         """
-        Sum with another QFLoat
+        Sum with another QFLoat or single integer
         Summing will potentially make values in the sum array be greater than the base and not tidy, so isTidy becomes False
         Hence we need to tidy the sum if requested
         """
-        self.checkCompatibility(other)
-        addition = QFloat(self._array + other._array, self._ints, self._base, False)
+        if isinstance(other, fhe.tracing.tracer.Tracer) or isinstance(other, numbers.Integral):
+            # Add a single integer
+            addition = QFloat( self._array, self._ints, self._base, False)
+            addition._array[self._int-1]+=other
+        else:
+            self.checkCompatibility(other)
+            addition = QFloat(self._array + other._array, self._ints, self._base, False)
+
         if QFloat.KEEP_TIDY:
             addition.tidy()
+
         return addition
+
+    def __radd__(self, other):
+        """
+        Add other object on the right
+        """
+        return self.__add__(other)
+
+    def __iadd__(self, other):
+        """
+        Sum with another QFLoat or single integer, in place
+        Summing will potentially make values in the sum array be greater than the base and not tidy, so isTidy becomes False
+        Hence we need to tidy if requested
+        """
+        if isinstance(other, fhe.tracing.tracer.Tracer) or isinstance(other, numbers.Integral):
+            # Add a single integer
+            self._array[self._int-1]+=other
+        else:
+            self.checkCompatibility(other)
+            self._array += other._array
+
+        self._isTidy=False
+        self._isBaseTidy=False
+        self._sign=None
+
+        if QFloat.KEEP_TIDY:
+            self.tidy()
+
+        return self
 
     def __sub__(self, other):
         """
@@ -518,7 +554,7 @@ class QFloat():
         """
 
         if isinstance(other, fhe.tracing.tracer.Tracer) or isinstance(other, numbers.Integral):
-            # multiply everything by a single number
+            # multiply everything by a single integer
             multiplication = QFloat( other*self._array, self._ints, self._base, False)        
         else:
             # multiply with another compatible QFloat 
@@ -538,7 +574,7 @@ class QFloat():
             # the multiplication array is made from the sum of the muarray rows
             multiplication = QFloat(np.sum(mularray, axis=0), self._ints, self._base, False)
 
-            if self._sign and other._sign: # avoid computing sign of the sign if we already know it
+            if self._sign is not None and other._sign is not None: # avoid computing sign of the sign if we already know it
                 multiplication._sign = self._sign*other._sign
 
         if QFloat.KEEP_TIDY:
@@ -550,6 +586,49 @@ class QFloat():
         Multiply with other object on the right
         """
         return self.__mul__(other)
+
+    def __imul__(self, other):
+        """
+        Multiply with another QFLoat or integer, in place
+        Multiplying will potentially make values in the sum array be greater than the base and not tidy, so isTidy becomes False
+        Hence we need to tidy if requested
+
+        WARNING: precision of multiplication does not increase, so it may overflow if not enough
+        """
+
+        if isinstance(other, fhe.tracing.tracer.Tracer) or isinstance(other, numbers.Integral):
+            # multiply everything by a single integer
+            self._array *= other
+        else:
+            # multiply with another compatible QFloat 
+            self.checkCompatibility(other)
+
+            # A QFloat array is made of 2 parts, integer part and float part
+            # The multiplication array will be the sum of integer * other + float * other
+            n=len(self)
+            mularray = fhe.zeros((n, n))
+            # integer part, shift  to the left
+            for i in range(0,self._ints):
+                mularray[i, 0:n-(self._ints-1-i)] = self._array[i]*other._array[self._ints-1-i:]
+            # float part, shift to the right
+            for i in range(self._ints,n):
+                mularray[i, 1+i-self._ints:] = self._array[i]*other._array[0:n-(i-self._ints)-1]
+
+            # the multiplication array is made from the sum of the muarray rows
+            self._array = np.sum(mularray, axis=0)
+
+            if self._sign and other._sign: # avoid computing sign of the sign if we already know it
+                self._sign = self._sign*other._sign
+            else:
+                self._sign=None
+
+        self._isTidy=False
+        self._isBaseTidy=False
+
+        if QFloat.KEEP_TIDY:
+            self.tidy()
+
+        return self
 
     def __truediv__(self, other):
         """
@@ -568,11 +647,11 @@ class QFloat():
         other.tidy()
 
         # get signs and make arrays positive
-        sgna = self.getSign()
-        a = sgna*(self._array)
+        signa = self.getSign()
+        a = signa*(self._array)
 
-        sgnb = other.getSign()
-        b = sgnb*(other._array)        
+        signb = other.getSign()
+        b = signb*(other._array)        
 
         # The float precision is the number of digits after the dot:
         fp = len(self)-self._ints
@@ -584,7 +663,7 @@ class QFloat():
         div_array = base_p_division(shift_arr, b, self._base)
         # The result array encodes for a QFloat with fp precision, which is equivalent to divide the result by fp
         # giving as expected the number (a * fp) / b / fp :
-        division = QFloat(div_array[fp:]*sgna*sgnb, self._ints, self._base, True, signa*signb) # result is tidy and signed
+        division = QFloat(div_array[fp:]*signa*signb, self._ints, self._base, True, signa*signb) # result is tidy and signed
 
         return division
 
