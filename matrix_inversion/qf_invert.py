@@ -293,9 +293,9 @@ def float_matrix_to_qfloat_arrays(M, qf_len, qf_ints, qf_base):
 
     return qf_arrays, qf_signs
 
-def qfloat_arrays_to_float_matrix(qf_arrays, qf_signs, qf_ints, qf_base):
+def qfloat_arrays_to_QFloat_matrix(qf_arrays, qf_signs, qf_ints, qf_base):
     """
-    converts qfloats arrays to a float matrix
+    converts qfloats arrays to a QFloat matrix
     """
     n = int(np.sqrt(qf_arrays.shape[0]))
     qf_M = []
@@ -309,6 +309,20 @@ def qfloat_arrays_to_float_matrix(qf_arrays, qf_signs, qf_ints, qf_base):
         qf_M.append(row)
 
     return qf_M
+
+def qfloat_arrays_to_float_matrix(qf_arrays, qf_ints, qf_base):
+    """
+    converts qfloats arrays to a float matrix
+    """
+    n = int(np.sqrt(qf_arrays.shape[0]))
+    M = np.zeros((n,n))
+    index=0
+    for i in range(n):
+        for j in range(n):
+            M[i,j] = QFloat(qf_arrays[index,:], qf_ints, qf_base).toFloat()
+            index+=1
+
+    return M    
 
 def qfloat_matrix_to_arrays(M, qf_len, qf_ints, qf_base):
     """
@@ -336,7 +350,7 @@ def fhematrix(qf_arrays, qf_signs, params):
     assert( qf_len == qf_arrays.shape[1])
 
     # reconstruct the matrix of QFloats with encrypted values:
-    qf_M = qfloat_arrays_to_float_matrix(qf_arrays, qf_signs, qf_ints, qf_base)
+    qf_M = qfloat_arrays_to_QFloat_matrix(qf_arrays, qf_signs, qf_ints, qf_base)
 
     # compute the pivot matrix
     #qf_P = qf_pivot_matrix(qf_M)
@@ -394,7 +408,7 @@ def test_qf_fhe(n, simulate=False):
     # gen random matrix
     M = np.random.uniform(0, 100, (n,n))
     qf_base=2
-    qf_len = 30
+    qf_len = 10
     qf_ints = 8
 
     # convert it to QFloat arrays
@@ -403,8 +417,10 @@ def test_qf_fhe(n, simulate=False):
     # set params
     params = [n, qf_len, qf_ints, qf_base]
 
+    QFloat.KEEP_TIDY=False
+
     compiler = fhe.Compiler(lambda x,y: fhematrix(x,y,params), {"x": "encrypted", "y": "encrypted"})
-    circuit = compiler.compile(
+    make_circuit = lambda : compiler.compile(
         inputset=[
                 (np.random.randint(0, qf_base, size=(n*n, qf_len)),
                 np.random.randint(0, qf_base, size=(n*n,)))
@@ -419,12 +435,12 @@ def test_qf_fhe(n, simulate=False):
         verbose=False,
     )
 
+    circuit = measure_time( make_circuit, 'Compiling')
+
     # First print the description and a waiting message
     print("Matrix inversion")
     print("Computing ...", end="", flush=True)
     print("\r", end="")
-
-    #QFloat.KEEP_TIDY=False
 
     # Run FHE
     if not simulate:
@@ -436,8 +452,12 @@ def test_qf_fhe(n, simulate=False):
 
     QFloat.KEEP_TIDY=True
 
-    print(decrypted)
-    print(pivot_matrix(M))
+    qf_L = qfloat_arrays_to_float_matrix(decrypted, qf_ints, qf_base)
+
+    print(qf_L)
+
+    P, L, U = lu_decomposition(M)
+    print(L)
 
     # Convert output to floats
     # output_mat = qfloat_arrays_to_float_matrix(qf_arrays, qf_signs, qf_ints, qf_base)
