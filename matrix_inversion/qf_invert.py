@@ -380,6 +380,7 @@ def qf_matrix_inverse(qf_arrays, qf_signs, params):
 
     return qf_arrays_out
 
+
 ########################################################################################
 #                                   TESTS
 ########################################################################################
@@ -397,21 +398,6 @@ def test_matrix_inverse(n, m=100):
     print('test_matrix_inverse OK')
 
 
-
-def test_qf_matrix_inverse(n, m=100):
-    for i in range(m):
-        M = np.random.uniform(0, 100, (n,n))
-        P = pivot_matrix(M)
-
-        # with qfloats
-        qf_M = map_2D_list(M.tolist(), lambda x:QFloat.fromFloat(x,30,8,2))
-        P2 = qf_pivot_matrix(qf_M)
-
-        print(P-P2)
-        
-    print('test_matrix_inverse OK')
-
-
 def measure_time(function, descripton, *inputs):
     #Compute a function on inputs and return output along with duration
     print(descripton+' ...', end="", flush=True)
@@ -423,28 +409,10 @@ def measure_time(function, descripton, *inputs):
     return output
 
 
-def test_qf_fhe(n, simulate=False):
-    # gen random matrix
-    M = np.random.uniform(0, 100, (n,n))
-    qf_base= 2
-    qf_len = 16
-    qf_ints = 9
-
-    #results for 2, 16, 9
-    # |  Compiling : 821.14 s  |
-    # |  Simulating : 0.57 s  |
-    # [[ 3.5625     2.796875 ]
-    # [-8.0078125 -6.015625 ]]
-    # [[ 3.67352128  2.88504985]
-    # [-8.35026665 -6.28577699]]    
-
-    # convert it to QFloat arrays
-    qf_arrays, qf_signs = float_matrix_to_qfloat_arrays(M, qf_len, qf_ints, qf_base)
+def compile_circuit(n, qf_len, qf_ints, qf_base):
 
     # set params
     params = [n, qf_len, qf_ints, qf_base]
-
-    QFloat.KEEP_TIDY=False
 
     compiler = fhe.Compiler(lambda x,y: qf_matrix_inverse(x,y,params), {"x": "encrypted", "y": "encrypted"})
     make_circuit = lambda : compiler.compile(
@@ -462,10 +430,18 @@ def test_qf_fhe(n, simulate=False):
         verbose=False,
     )
 
-    # First print the description and a waiting message
-    print("Matrix inversion\n")
- 
     circuit = measure_time( make_circuit, 'Compiling')
+    return circuit
+
+
+def test_qf_fhe(n, circuit, qf_len, qf_ints, qf_base, simulate=False):
+    # gen random matrix
+    M = np.random.uniform(0, 100, (n,n))
+
+    # convert it to QFloat arrays
+    qf_arrays, qf_signs = float_matrix_to_qfloat_arrays(M, qf_len, qf_ints, qf_base)
+
+    QFloat.KEEP_TIDY=False
 
     # Run FHE
     if not simulate:
@@ -518,8 +494,22 @@ def test_qf_python(n):
     Minv = matrix_inverse(M)
     print(Minv)    
 
-#test_lu_decomposition(2)
-#test_matrix_inverse(3,100)
-#test_qf_matrix_inverse(4,4)
-test_qf_fhe(2, True)
-#test_qf_python(3)
+
+if __name__ == '__main__':
+    #test_qf_python(3)
+
+    n=2
+    qf_len = 16
+    qf_ints = 9
+    qf_base = 2
+
+    circuit_n = compile_circuit(n, qf_len, qf_ints, qf_base)
+    test_qf_fhe(2, circuit, qf_len, qf_ints, qf_base, False)
+
+    #results for 16, 9, 2
+    # |  Compiling : 821.14 s  |
+    # |  Simulating : 0.57 s  |
+    # [[ 3.5625     2.796875 ]
+    # [-8.0078125 -6.015625 ]]
+    # [[ 3.67352128  2.88504985]
+    # [-8.35026665 -6.28577699]]    
