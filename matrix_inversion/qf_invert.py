@@ -179,21 +179,18 @@ def transpose_2DList(list2D):
     """
     return [list(row) for row in zip(*list2D)]
 
-def qf_lu_decomposition(M, qf_len, qf_ints, qf_base):
+def qf_lu_decomposition(M, qf0):
     """
     Performs an LU Decomposition of square QFloats 2D-list matrix M
     The function returns P, L, and U such that M = PLU. 
     """
     assert(len(M)==len(M[0]))
-    assert(qf_len==len(M[0][0]))
     n = len(M)
 
     # add __len__ function to fhe.tracing.tracer.Tracer for simplicity:
     def arrlen(self):
         return self.shape[0]
     fhe.tracing.tracer.Tracer.__len__ = arrlen
-
-    qf0 = QFloat.zero(qf_len, qf_ints, qf_base) # a zero QFloat with good format
 
     # Initialize 2D-list matrices for L and U
     # (QFloats can be multiplied with integers, this saves computations)
@@ -259,6 +256,25 @@ def lu_inverse(P, L, U):
 
     return np.transpose(X)
 
+
+def qf_lu_inverse(P, L, U, qf0):
+    n = len(L)
+
+    # Forward substitution: Solve L * Y = P * A for Y
+    Y = np.zeros((n,n), dtype='int').tolist()
+    for i in range(n):
+        Y[i][0] = P[i][0] / L[0][0]
+        for j in range(1, n):
+            Y[i][j] = (P[i][j] - qf_list_dot_product([ L[j][k] for k in range(j) ], [ Y[i][k] for k in range(j)], qf0)) / L[j][j]
+
+    # Backward substitution: Solve U * X = Y for X
+    X = np.zeros((n,n), dtype='int').tolist()
+    for i in range(n - 1, -1, -1):
+        X[i][-1] = Y[i][-1] / U[-1][-1]
+        for j in range(n - 2, -1, -1):
+            X[i][j] = (Y[i][j] - qf_list_dot_product( [ U[j][k] for k in range(j+1,n)], [ X[i][k] for k in range(j+1,n) ], qf0)) / U[j][j]
+
+    return transpose_2DList(X)
 
 
 
@@ -338,7 +354,7 @@ def qfloat_matrix_to_arrays(M, qf_len, qf_ints, qf_base):
     return qf_arrays
 
 
-def fhematrix(qf_arrays, qf_signs, params):
+def qf_matrix_inverse(qf_arrays, qf_signs, params):
     """
     Main function
     """
@@ -350,14 +366,17 @@ def fhematrix(qf_arrays, qf_signs, params):
     # reconstruct the matrix of QFloats with encrypted values:
     qf_M = qfloat_arrays_to_QFloat_matrix(qf_arrays, qf_signs, qf_ints, qf_base)
 
-    # compute the pivot matrix
-    #qf_P = qf_pivot_matrix(qf_M)
+    # a zero QFloat with good format
+    qf0 = QFloat.zero(qf_len, qf_ints, qf_base)
 
     # compute the LU decomposition
-    qf_P, qf_L, qf_U = qf_lu_decomposition(qf_M, qf_len, qf_ints, qf_base)
+    qf_P, qf_L, qf_U = qf_lu_decomposition(qf_M, qf0)
+
+    # compute inverse from P L U
+    qf_Minv = qf_lu_inverse(qf_P, qf_L, qf_U, qf0)
 
     # break the resulting QFloats into arrays:
-    qf_arrays_out = qfloat_matrix_to_arrays(qf_U, qf_len, qf_ints, qf_base)
+    qf_arrays_out = qfloat_matrix_to_arrays(qf_Minv, qf_len, qf_ints, qf_base)
 
     return qf_arrays_out
 
@@ -469,7 +488,7 @@ def test_qf_python(n):
     M = np.random.uniform(0, 100, (n,n))
     N = np.random.uniform(0, 100, (n,n))
     qf_base= 2
-    qf_len = 16
+    qf_len = 30
     qf_ints = 8
 
     # convert it to QFloat arrays
@@ -480,7 +499,7 @@ def test_qf_python(n):
 
     #QFloat.KEEP_TIDY=False
 
-    output = fhematrix(qf_arrays, qf_signs, params)
+    output = qf_matrix_inverse(qf_arrays, qf_signs, params)
 
     QFloat.KEEP_TIDY=True
 
@@ -489,11 +508,11 @@ def test_qf_python(n):
     print(qf_Res)
     print(' ')
 
-    P, L, U = lu_decomposition(M)
-    print(U)    
+    Minv = matrix_inverse(M)
+    print(Minv)    
 
 #test_lu_decomposition(2)
 #test_matrix_inverse(3,100)
 #test_qf_matrix_inverse(4,4)
-test_qf_fhe(2, True)
-#test_qf_python(2)
+#test_qf_fhe(2, True)
+test_qf_python(2)
