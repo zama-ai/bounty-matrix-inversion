@@ -119,11 +119,10 @@ def lu_decomposition(M):
     for j in range(n):
         # All diagonal entries of L are set to unity
         L[j, j] = 1.0
-
         # u_{ij} = a_{ij} - \sum_{k=1}^{i-1} u_{kj} l_{ik}
         for i in range(j+1):
             s1 = np.dot(U[0:i, j], L[i,0:i])
-            U[i, j] = PM[i, j] - s1
+            U[i, j] = PM[i, j] - s1            
 
         # l_{ij} = \frac{1}{u_{jj}} (a_{ij} - \sum_{k=1}^{j-1} u_{kj} l_{ik})
         for i in range(j, n):
@@ -134,10 +133,14 @@ def lu_decomposition(M):
     P= np.transpose(P)
 
     # now M = PLU
-    return P, L, U
+    return PM, L, U
 
 
-
+def matrix_column(M,j):
+    """
+    Extract column from 2D list matrix
+    """
+    return [row[j] for row in M] 
 
 def qf_list_dot_product(list1, list2, qf0):
     """
@@ -150,9 +153,9 @@ def qf_list_dot_product(list1, list2, qf0):
 
     for i in range(len(list1)):
         if isinstance(list1[i], fhe.tracing.tracer.Tracer): # multiply a QFloat with a Tracer, not the opposite
-            result += list2[i] * list1[i] # in place addition is supported    
+            result += (list2[i] * list1[i]) # in place addition is supported    
         else:
-            result += list1[i] * list2[i] # in place addition is supported
+            result += (list1[i] * list2[i]) # in place addition is supported
     
     return result
 
@@ -166,7 +169,7 @@ def qf_list_matrix_multiply(matrix1, matrix2, qf0):
 
     for i in range(len(matrix1)):
         for j in range(len(matrix2[0])):
-            result[i][j] = qf_list_dot_product( matrix1[i][:], matrix2[:][j] , qf0)
+            result[i][j] = qf_list_dot_product( matrix1[i], matrix_column(matrix2,j) , qf0)
     
     return result
 
@@ -194,7 +197,7 @@ def qf_lu_decomposition(M, qf_len, qf_ints, qf_base):
 
     # Initialize 2D-list matrices for L and U
     # (QFloats can be multiplied with integers, this saves computations)
-    L = np.identity(n, dtype='int').tolist()
+    L = np.zeros((n,n), dtype='int').tolist()
     U = np.zeros((n,n), dtype='int').tolist()
 
     # Create the pivot matrix P and the multiplied matrix PM
@@ -203,13 +206,15 @@ def qf_lu_decomposition(M, qf_len, qf_ints, qf_base):
 
     # Perform the LU Decomposition
     for j in range(n):
+        # All diagonal entries of L are set to unity
+        L[j][j] = 1
         # u_{ij} = a_{ij} - \sum_{k=1}^{i-1} u_{kj} l_{ik}
         for i in range(j+1):
             if i>0:
                 s1 = qf_list_dot_product([U[k][j] for k in range(0,i)], [ L[i][k] for k in range(0,i) ], qf0)
                 U[i][j] = PM[i][j] - s1
             else:
-                U[i][j] = PM[i][j]
+                U[i][j] = PM[i][j].copy()
 
         # l_{ij} = \frac{1}{u_{jj}} (a_{ij} - \sum_{k=1}^{j-1} u_{kj} l_{ik})
         for i in range(j, n):
@@ -223,7 +228,7 @@ def qf_lu_decomposition(M, qf_len, qf_ints, qf_base):
     P= transpose_2DList(P)
 
     # now M = PLU
-    return P, L, U
+    return PM, L, U
 
 
 
@@ -332,8 +337,11 @@ def qfloat_matrix_to_arrays(M, qf_len, qf_ints, qf_base):
 
     return qf_arrays
 
-def fhematrix(qf_arrays, qf_signs, params):
 
+def fhematrix(qf_arrays, qf_signs, params):
+    """
+    Main function
+    """
     n, qf_len, qf_ints, qf_base = params
 
     assert( n*n == qf_arrays.shape[0])
@@ -349,7 +357,7 @@ def fhematrix(qf_arrays, qf_signs, params):
     qf_P, qf_L, qf_U = qf_lu_decomposition(qf_M, qf_len, qf_ints, qf_base)
 
     # break the resulting QFloats into arrays:
-    qf_arrays_out = qfloat_matrix_to_arrays(qf_L, qf_len, qf_ints, qf_base)
+    qf_arrays_out = qfloat_matrix_to_arrays(qf_U, qf_len, qf_ints, qf_base)
 
     return qf_arrays_out
 
@@ -387,6 +395,8 @@ def test_qf_matrix_inverse(n, m=100):
 
 def measure_time(function, descripton, *inputs):
     #Compute a function on inputs and return output along with duration
+    print(descripton+' ...', end="", flush=True)
+    print("\r", end="")
     start = time.time()
     output = function(*inputs)
     end = time.time()
@@ -426,10 +436,8 @@ def test_qf_fhe(n, simulate=False):
     )
 
     # First print the description and a waiting message
-    print("Matrix inversion")
-    print("Computing ...", end="", flush=True)
-    print("\r", end="")
-
+    print("Matrix inversion\n")
+ 
     circuit = measure_time( make_circuit, 'Compiling')
 
     # Run FHE
@@ -455,7 +463,37 @@ def test_qf_fhe(n, simulate=False):
     # print(output_mat) 
     # print(pivot_matrix(M))
 
+
+def test_qf_python(n):
+    # gen random matrix
+    M = np.random.uniform(0, 100, (n,n))
+    N = np.random.uniform(0, 100, (n,n))
+    qf_base=10
+    qf_len = 30
+    qf_ints = 10
+
+    # convert it to QFloat arrays
+    qf_arrays, qf_signs = float_matrix_to_qfloat_arrays(M, qf_len, qf_ints, qf_base)
+
+    # set params
+    params = [n, qf_len, qf_ints, qf_base]
+
+    #QFloat.KEEP_TIDY=False
+
+    output = fhematrix(qf_arrays, qf_signs, params)
+
+    QFloat.KEEP_TIDY=True
+
+    qf_Res = qfloat_arrays_to_float_matrix(output, qf_ints, qf_base)
+
+    print(qf_Res)
+    print(' ')
+
+    P, L, U = lu_decomposition(M)
+    print(U)    
+
 #test_lu_decomposition(2)
 #test_matrix_inverse(3,100)
 #test_qf_matrix_inverse(4,4)
-test_qf_fhe(2, True)
+#test_qf_fhe(2, True)
+test_qf_python(2)

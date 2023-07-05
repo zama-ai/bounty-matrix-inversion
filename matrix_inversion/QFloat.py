@@ -667,9 +667,47 @@ class QFloat():
 
         return division
 
+    def __itruediv__(self, other):
+        """
+        Divide by another QFLoat, in place
+        Dividing requires arrays to be tidy and will return a tidy array
 
-# class PreciseQFloat()
+        Consider two integers a and b, that we want to divide with float precision fp:
+        We have: (a / b) = (a * fp) / b / fp
+        Where a * fp / b is an integer division, and ((a * fp) / b / fp) is a float number with fp precision
+
+        WARNING: dividing by zero will give zero
+        WARNING: precision of division does not increase
+        """
+        self.checkCompatibility(other)
+        self.tidy()
+        other.tidy()
+
+        # get signs and make arrays positive
+        signa = self.getSign()
+        a = signa*(self._array)
+
+        signb = other.getSign()
+        b = signb*(other._array)        
+
+        # The float precision is the number of digits after the dot:
+        fp = len(self)-self._ints
+
+        # We consider each array as representing integers a and b here
+        # Let's left shit the first array which corresponds by multiplying a by fp:
+        shift_arr = np.concatenate((a, fhe.zeros(fp)), axis=0)
+        # Make the integer division (a*fp)/b with our long division algorithm:
+        div_array = base_p_division(shift_arr, b, self._base)
+        # The result array encodes for a QFloat with fp precision, which is equivalent to divide the result by fp
+        # giving as expected the number (a * fp) / b / fp :
+        self._sign = signa*signb
+        self._array = div_array[fp:]*self._sign  # result is tidy and signed
+
+        return self
+
+# class QFloatQuotient()
 
 #     def __mul__(self, other):
 #         #return a result with bigger length thatn self and other to preven overflow
+#         # a/b * c/d  = ac/cd
 
