@@ -90,7 +90,7 @@ def base_p_division(dividend, divisor, p):
     for i in range(dividend.size):
         if i>0:
             # Left-roll the remainder and bring down the next bit from the dividend
-            # also cut remainder if its size is bigger than divisor, cause we know they are extra zeros
+            # also cut remainder if its size is bigger than divisor's, cause there are extra zeros
             d=1*(remainder.size > divisor.size)
             remainder = np.concatenate((remainder[d:], dividend[i].reshape(1)), axis=0)
         # If the remainder is larger than or equal to the divisor

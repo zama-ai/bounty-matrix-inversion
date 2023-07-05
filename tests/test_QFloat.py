@@ -189,7 +189,7 @@ class TestQFloat(unittest.TestCase):
     #     assert( circuit.run(seq1, seq1) )
 
 
-#unittest.main()
+unittest.main()
 
-suite = unittest.TestLoader().loadTestsFromName('test_QFloat.TestQFloat.test_div_np')
-unittest.TextTestRunner(verbosity=1).run(suite)
+#suite = unittest.TestLoader().loadTestsFromName('test_QFloat.TestQFloat.test_div_np')
+#unittest.TextTestRunner(verbosity=1).run(suite)

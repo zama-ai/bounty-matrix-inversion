@@ -426,9 +426,17 @@ def measure_time(function, descripton, *inputs):
 def test_qf_fhe(n, simulate=False):
     # gen random matrix
     M = np.random.uniform(0, 100, (n,n))
-    qf_base=2
-    qf_len = 12
-    qf_ints = 8
+    qf_base= 2
+    qf_len = 16
+    qf_ints = 9
+
+    #results for 2, 16, 9
+    # |  Compiling : 821.14 s  |
+    # |  Simulating : 0.57 s  |
+    # [[ 3.5625     2.796875 ]
+    # [-8.0078125 -6.015625 ]]
+    # [[ 3.67352128  2.88504985]
+    # [-8.35026665 -6.28577699]]    
 
     # convert it to QFloat arrays
     qf_arrays, qf_signs = float_matrix_to_qfloat_arrays(M, qf_len, qf_ints, qf_base)
@@ -438,7 +446,7 @@ def test_qf_fhe(n, simulate=False):
 
     QFloat.KEEP_TIDY=False
 
-    compiler = fhe.Compiler(lambda x,y: fhematrix(x,y,params), {"x": "encrypted", "y": "encrypted"})
+    compiler = fhe.Compiler(lambda x,y: qf_matrix_inverse(x,y,params), {"x": "encrypted", "y": "encrypted"})
     make_circuit = lambda : compiler.compile(
         inputset=[
                 (np.random.randint(0, qf_base, size=(n*n, qf_len)),
@@ -473,8 +481,8 @@ def test_qf_fhe(n, simulate=False):
 
     print(qf_Res)
 
-    P, L, U = lu_decomposition(M)
-    print(U)
+    Minv = matrix_inverse(M)
+    print(Minv)
 
     # Convert output to floats
     # output_mat = qfloat_arrays_to_float_matrix(qf_arrays, qf_signs, qf_ints, qf_base)
@@ -486,10 +494,9 @@ def test_qf_fhe(n, simulate=False):
 def test_qf_python(n):
     # gen random matrix
     M = np.random.uniform(0, 100, (n,n))
-    N = np.random.uniform(0, 100, (n,n))
     qf_base= 2
-    qf_len = 30
-    qf_ints = 8
+    qf_len = 16
+    qf_ints = 10
 
     # convert it to QFloat arrays
     qf_arrays, qf_signs = float_matrix_to_qfloat_arrays(M, qf_len, qf_ints, qf_base)
@@ -514,5 +521,5 @@ def test_qf_python(n):
 #test_lu_decomposition(2)
 #test_matrix_inverse(3,100)
 #test_qf_matrix_inverse(4,4)
-#test_qf_fhe(2, True)
-test_qf_python(2)
+test_qf_fhe(2, True)
+#test_qf_python(3)
