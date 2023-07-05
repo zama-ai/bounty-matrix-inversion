@@ -408,7 +408,7 @@ def test_qf_fhe(n, simulate=False):
     # gen random matrix
     M = np.random.uniform(0, 100, (n,n))
     qf_base=2
-    qf_len = 10
+    qf_len = 12
     qf_ints = 8
 
     # convert it to QFloat arrays
@@ -450,12 +450,12 @@ def test_qf_fhe(n, simulate=False):
 
     QFloat.KEEP_TIDY=True
 
-    qf_L = qfloat_arrays_to_float_matrix(decrypted, qf_ints, qf_base)
+    qf_Res = qfloat_arrays_to_float_matrix(decrypted, qf_ints, qf_base)
 
-    print(qf_L)
+    print(qf_Res)
 
     P, L, U = lu_decomposition(M)
-    print(L)
+    print(U)
 
     # Convert output to floats
     # output_mat = qfloat_arrays_to_float_matrix(qf_arrays, qf_signs, qf_ints, qf_base)
@@ -468,9 +468,9 @@ def test_qf_python(n):
     # gen random matrix
     M = np.random.uniform(0, 100, (n,n))
     N = np.random.uniform(0, 100, (n,n))
-    qf_base=10
-    qf_len = 30
-    qf_ints = 10
+    qf_base= 2
+    qf_len = 16
+    qf_ints = 8
 
     # convert it to QFloat arrays
     qf_arrays, qf_signs = float_matrix_to_qfloat_arrays(M, qf_len, qf_ints, qf_base)
@@ -495,5 +495,5 @@ def test_qf_python(n):
 #test_lu_decomposition(2)
 #test_matrix_inverse(3,100)
 #test_qf_matrix_inverse(4,4)
-#test_qf_fhe(2, True)
-test_qf_python(2)
+test_qf_fhe(2, True)
+#test_qf_python(2)

@@ -66,15 +66,16 @@ def float_to_base_p(f, precision, p):
 def base_p_subtraction(a, b, p):
     """
     Subtract arrays in base p. (a and b must be tidy, postive with a > b)
+    Also, if they have different sizes, the longer array is considered to have extra zeros to the left
     """
+
     difference = fhe.zeros(a.size)
     borrow = 0
-    for i in reversed(range(a.size)):
+    for i in range(min(a.size,b.size)):
         # Perform subtraction for each bit
-        temp = a[i] - b[i] - borrow
+        temp = a[-i-1] - b[-i-1] - borrow
         borrow = temp < 0
-        temp += p*borrow
-        difference[i] = temp
+        difference[-i-1] = temp + p*borrow
     return difference
 
 def base_p_division(dividend, divisor, p):
@@ -84,22 +85,36 @@ def base_p_division(dividend, divisor, p):
     # Initialize the quotient array
     quotient = fhe.zeros(dividend.size)
     # Initialize the remainder
-    remainder = fhe.zeros(divisor.size)
+    remainder = dividend[0].reshape(1)
 
     for i in range(dividend.size):
-        # Left-roll the remainder
-        remainder = np.concatenate((remainder[1:], remainder[0].reshape(1)), axis=0)
-        # Bring down the next bit from the dividend
-        remainder[-1] = dividend[i]
+        if i>0:
+            # Left-roll the remainder and bring down the next bit from the dividend
+            remainder = np.concatenate((remainder, dividend[i].reshape(1)), axis=0)
         # If the remainder is larger than or equal to the divisor
         for j in range(p-1):
-            is_ge = is_greater_or_equal(remainder, divisor)
+            is_ge = is_greater_or_equal_difflen(remainder, divisor)
             # Subtract the divisor from the remainder
             remainder = is_ge*base_p_subtraction(remainder, divisor, p) + (1-is_ge)*remainder
             # Set the current quotient bit to 1
             quotient[i] += is_ge
 
-    return quotient
+    return quotient    
+
+
+def is_greater_or_equal_difflen(A, B):
+    """
+    Computes wether an array is greater or equal than another, in alphabetical order
+    Optimized for array of different sizes
+    """    
+    diff=B.size-A.size
+    if diff==0:
+        return is_greater_or_equal(A, B)
+    elif diff>0:
+        return is_greater_or_equal(A, B[diff:]) & (np.sum(B[0:diff])==0)
+    else:
+        return is_greater_or_equal(A[-diff:], B) | (np.sum(A[0:-diff])>0)
+
 
 def is_greater_or_equal(A, B):
     """
