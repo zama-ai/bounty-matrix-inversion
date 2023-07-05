@@ -49,15 +49,7 @@ def qf_argmax(indices, qfloats):
 
     return maxi
 
-def boolean_sum(sumlist, conditions):
-    """
-    Sum elements in a list with boolean conditioning
-    """
-    bsum = sumlist[0]*conditions[0]
-    for i in range(1,len(sumlist)):
-        bsum += sumlist[i]*conditions[i]
 
-    return bsum
 
 def qf_pivot_matrix(M):
     """
@@ -84,8 +76,6 @@ def qf_pivot_matrix(M):
 
         # swap rows in pivot_mat:
         # row j becomes row r:
-        #pivot_mat[j,:] = boolean_sum( [ temp_mat[k,:] for k in range(j,n) ], np.arange(j,n)==r )
-        
         bsum = temp_mat[j,:]*(j==r)
         for i in range(j+1,n):
             bsum += temp_mat[i,:]*(i==r)
@@ -435,12 +425,12 @@ def test_qf_fhe(n, simulate=False):
         verbose=False,
     )
 
-    circuit = measure_time( make_circuit, 'Compiling')
-
     # First print the description and a waiting message
     print("Matrix inversion")
     print("Computing ...", end="", flush=True)
     print("\r", end="")
+
+    circuit = measure_time( make_circuit, 'Compiling')
 
     # Run FHE
     if not simulate:

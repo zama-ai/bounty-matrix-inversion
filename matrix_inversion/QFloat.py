@@ -69,7 +69,7 @@ def base_p_subtraction(a, b, p):
     """
     difference = fhe.zeros(a.size)
     borrow = 0
-    for i in reversed(range(len(a))):
+    for i in reversed(range(a.size)):
         # Perform subtraction for each bit
         temp = a[i] - b[i] - borrow
         borrow = temp < 0
@@ -86,7 +86,7 @@ def base_p_division(dividend, divisor, p):
     # Initialize the remainder
     remainder = fhe.zeros(divisor.size)
 
-    for i in range(len(dividend)):
+    for i in range(dividend.size):
         # Left-roll the remainder
         remainder = np.concatenate((remainder[1:], remainder[0].reshape(1)), axis=0)
         # Bring down the next bit from the dividend
@@ -617,7 +617,7 @@ class QFloat():
             # the multiplication array is made from the sum of the muarray rows
             self._array = np.sum(mularray, axis=0)
 
-            if self._sign and other._sign: # avoid computing sign of the sign if we already know it
+            if self._sign is not None and other._sign is not None: # avoid computing sign of the sign if we already know it
                 self._sign = self._sign*other._sign
             else:
                 self._sign=None
