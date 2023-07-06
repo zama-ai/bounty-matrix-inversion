@@ -6,49 +6,52 @@ from concrete import fhe
 
 sys.path.append(os.getcwd())
 
-from matrix_inversion.QFloat import QFloat
-
-
-class QFloatCircuit:
-   
-    """
-    Circuit factory class for testing FheSeq on 2 sequences input
-    """
-    def __init__(self, length, base=2, simulate=False):
-        self.length=length
-        self.inputset=[
-            (np.random.randint(-base, base, size=(length,)),
-            np.random.randint(-base, base, size=(length,)))
-            for _ in range(100)
-        ]
-        self.circuit = None
-        self.simulate = simulate
-
-    def set(self, circuitFunction, verbose=False):
-        compiler = fhe.Compiler(lambda data1,data2: circuitFunction(data1, data2), {"data1": "encrypted", "data2": "encrypted"})
-        self.circuit = compiler.compile(
-            inputset=self.inputset,
-            configuration=fhe.Configuration(
-                enable_unsafe_features=True,
-                use_insecure_key_cache=True,
-                insecure_key_cache_location=".keys",
-                #dataflow_parallelize=True,
-            ),
-            verbose=verbose,
-        )
-    
-    def run(self, array1, array2):
-        if not self.circuit: raise Error('circuit was not set')
-        assert len(array1) == self.seq_length, f"Sequence 1 length is not correct, should be {self.seq_length} characters"
-        assert len(array2) == self.seq_length, f"Sequence 2 length is not correct, should be {self.seq_length} characters"
-
-        return self.circuit.simulate(array1, array2) if self.simulate else self.circuit.encrypt_run_decrypt(array1, array2)
+from matrix_inversion.QFloat import QFloat, BinaryValue
 
 
 SIMULATE=False
 base=2
 floatLenght = 8
 QFloat.KEEP_TIDY=False
+
+# TODO
+# class QFloatCircuit:
+   
+#     """
+#     Circuit factory class for testing FheSeq on 2 sequences input
+#     """
+#     def __init__(self, length, base=2, simulate=False):
+#         self.length=length
+#         self.inputset=[
+#             (np.random.randint(-base, base, size=(length,)),
+#             np.random.randint(-base, base, size=(length,)))
+#             for _ in range(100)
+#         ]
+#         self.circuit = None
+#         self.simulate = simulate
+
+#     def set(self, circuitFunction, verbose=False):
+#         compiler = fhe.Compiler(lambda data1,data2: circuitFunction(data1, data2), {"data1": "encrypted", "data2": "encrypted"})
+#         self.circuit = compiler.compile(
+#             inputset=self.inputset,
+#             configuration=fhe.Configuration(
+#                 enable_unsafe_features=True,
+#                 use_insecure_key_cache=True,
+#                 insecure_key_cache_location=".keys",
+#                 #dataflow_parallelize=True,
+#             ),
+#             verbose=verbose,
+#         )
+    
+#     def run(self, array1, array2):
+#         if not self.circuit: raise Error('circuit was not set')
+#         assert len(array1) == self.seq_length, f"Sequence 1 length is not correct, should be {self.seq_length} characters"
+#         assert len(array2) == self.seq_length, f"Sequence 2 length is not correct, should be {self.seq_length} characters"
+
+#         return self.circuit.simulate(array1, array2) if self.simulate else self.circuit.encrypt_run_decrypt(array1, array2)
+
+
+
 
 class TestQFloat(unittest.TestCase):
 
@@ -132,6 +135,9 @@ class TestQFloat(unittest.TestCase):
             f2 = (np.random.randint(0,200)-100)/10 # float of type (+/-)x.x
             integer = np.random.randint(-2,3)
             qf1 = QFloat.fromFloat(f1, size, ints, base)
+            assert( (2*qf1).toFloat() - 2*f1 < 0.1)
+            assert( (qf1*2).toFloat() - 2*f1 < 0.1)
+            assert( (BinaryValue(1)*qf1).toFloat() - f1 < 0.1)
             qf2 = QFloat.fromFloat(f2, size, ints, base)
             prod = qf1*qf2
             prod2 = integer*qf2
@@ -151,7 +157,14 @@ class TestQFloat(unittest.TestCase):
             f2 = (np.random.randint(0,200)-100)/10 # float of type (+/-)x.x
             if f2==0:
                 f2+=1.0
+            if f1==0:
+                f1+=1.0                
             qf1 = QFloat.fromFloat(f1, size, ints, base)
+
+            assert( (2/qf1).toFloat() - 2/f1 < 0.1)
+            assert( (qf1/2).toFloat() - f1/2.0 < 0.1)
+            assert( (BinaryValue(1)/qf1).toFloat() - 1.0/f1 < 0.1)
+
             qf2 = QFloat.fromFloat(f2, size, ints, base)
             div = qf1/qf2
             if not( div.toFloat()-(f1/f2) < 0.1 ):
@@ -186,12 +199,7 @@ class TestQFloat(unittest.TestCase):
 
 
 ######################### FHE TESTS #########################
-
-    # def test_operands(self):
-    #     circuit = QFloatCircuit(6, base, SIMULATE)
-
-    #     circuit.set(lambda x,y: FheSeq(x)==FheSeq(y) , True)
-    #     assert( circuit.run(seq1, seq1) )
+# TODO
 
 
 unittest.main()
