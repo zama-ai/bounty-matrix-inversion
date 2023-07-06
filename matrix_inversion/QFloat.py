@@ -4,7 +4,7 @@ from concrete import fhe
 
 
 #=======================================================================================================================
-#                                    Functions operating on arrays in base p
+#                            Functions operating on arrays in base p (p=2 means binary)
 #=======================================================================================================================
 
 def base_p_to_int(arr, p):
@@ -12,11 +12,11 @@ def base_p_to_int(arr, p):
     Convert base p array to int
     Can be signed (+/- values)
     """
-    # Flip the array to have least significant bit at the start
+    # Flip the array to have least significant digit at the start
     arr = np.flip(arr)
     # Compute the place values (p^0, p^1, p^2, ...)
     place_values = p**np.arange(arr.size)
-    # Return the sum of bit*place_value
+    # Return the sum of arr*place_value
     return np.sum(arr * place_values)
 
 def int_to_base_p(integer, n, p):
@@ -28,8 +28,10 @@ def int_to_base_p(integer, n, p):
     base_p_string= np.base_repr(np.abs(integer), p)
     # Prepend zeros to the binary representation until it reaches the desired size
     base_p_string = base_p_string.zfill(n)
+    if len(base_p_string) > n:
+        raise Exception(f"integer: {integer} cannot be rerpresented with {n} values in base {p}")
     # Convert the base_p string to a NumPy array of integers
-    base_p_array = np.sign(integer)*np.array([int(bit) for bit in base_p_string])
+    base_p_array = np.sign(integer)*np.array([int(digit) for digit in base_p_string])
     return base_p_array
 
 def base_p_to_float(arr, p):
@@ -140,8 +142,9 @@ def base_p_division(dividend, divisor, p):
 
 def is_greater_or_equal(a, b):
     """
-    Fast computation of wether an array number a is greater or equal to an array number b (both must be base tidy)
-    (See base_p_subtraction algorithm to understand why it works)
+    Fast computation of wether an array number a is greater or equal to an array number b
+    Both arrays must be base tidy, in which case the subtraction of a-b will work if a>=b and overflow if a<b
+    The overflow is a fast way to compute wether a>=b <=> not a<b
     """
     borrow = 0
     for i in range(min(a.size,b.size)):
@@ -162,6 +165,13 @@ def is_greater_or_equal_base_p(A, B):
         return is_greater_or_equal(A[-diff:], B) | (np.sum(A[0:-diff])>0)
 
 
+class BinaryValue():
+    """
+    A simple class to differentiate binary values from others, usefull in QFloat.__mul__
+    The value can be encrypted or not, as long as it is binary
+    """
+    def __init__(self, value):
+        self.value = value
 
 #=======================================================================================================================
 #                                                       QFfloats
@@ -170,15 +180,19 @@ def is_greater_or_equal_base_p(A, B):
 class QFloat():
     """
     A class for quantizing floats
+    Floats are encoded as encrypted or unencrypted arrays of integers in a specified base (fastest for fhe is binary)
+    Encrypted QFloat can be summed, multiplied etc. with unencrypted QFloats, and vice-versa
     """
 
-    # keepTidy: wether to keep arrays tidy at all time. Setting to False can save time
+    # keepTidy: wether to keep arrays tidy at all time. Setting to False can save time in FHE.
+    # Use it with caution because it can increase bitwidth too much in FHE:
+    # to prevent this, you may need to manually tidy some QFloats in your algorithm to prevent
     KEEP_TIDY=True
 
     def __init__(self, array, ints=None, base=2, isTidy=True, sign=None):
         """
-        - array can be encrypted or not, it must represent a number in base p (little endian)
-        - ints gives the number of digits before the dot, so ints = 1 will encode a number like x.xxxx...
+        - array: an encrypted or unencrypted array representing a number in base p (little endian)
+        - ints: gives the number of digits before the dot, so ints = 1 will encode a number like x.xxxx...
         - isTidy: wether the array is already tidy
         - sign: provide the sign if it is already known (usefull in FHE to save computations)
         """
@@ -576,7 +590,11 @@ class QFloat():
 
         if isinstance(other, fhe.tracing.tracer.Tracer) or isinstance(other, numbers.Integral):
             # multiply everything by a single integer
-            multiplication = QFloat( other*self._array, self._ints, self._base, False)        
+            multiplication = QFloat( other*self._array, self._ints, self._base, False)
+        elif isinstance(other, BinaryValue):
+            # multiply everything by a binary value, which does not affect tidyness of array
+            multiplication = QFloat( other.value*self._array, self._ints, self._base, self._isTidy)
+            multiplication._isBaseTidy = self._isBaseTidy
         else:
             # multiply with another compatible QFloat 
             self.checkCompatibility(other)
@@ -608,6 +626,9 @@ class QFloat():
         """
         return self.__mul__(other)
 
+    def __neg__(self):        
+        return self*(-1)
+
     def __imul__(self, other):
         """
         Multiply with another QFLoat or integer, in place
@@ -620,6 +641,12 @@ class QFloat():
         if isinstance(other, fhe.tracing.tracer.Tracer) or isinstance(other, numbers.Integral):
             # multiply everything by a single integer
             self._array *= other
+            self._isTidy=False
+            self._isBaseTidy=False
+        elif isinstance(other, BinaryValue):
+            # multiply everything by a binary value, which keeps the array tidy
+            self._array *= other.value
+            #self._isTidy and self._isBaseTidy are not impacted here
         else:
             # multiply with another compatible QFloat 
             self.checkCompatibility(other)
@@ -643,8 +670,8 @@ class QFloat():
             else:
                 self._sign=None
 
-        self._isTidy=False
-        self._isBaseTidy=False
+            self._isTidy=False
+            self._isBaseTidy=False
 
         if QFloat.KEEP_TIDY:
             self.tidy()
@@ -725,10 +752,4 @@ class QFloat():
         self._array = div_array[fp:]*self._sign  # result is tidy and signed
 
         return self
-
-# class QFloatQuotient()
-
-#     def __mul__(self, other):
-#         #return a result with bigger length thatn self and other to preven overflow
-#         # a/b * c/d  = ac/cd
 

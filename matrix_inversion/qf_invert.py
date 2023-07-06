@@ -1,18 +1,17 @@
 import numpy as np
 import scipy as sc
 import time
-from QFloat import QFloat
+from QFloat import QFloat, BinaryValue
 from concrete import fhe
 
 
 
+#############################################################################################################
 
-########################################################################################
-#                                   PIVOT MATRIX
-########################################################################################
+#                               ORIGINAL FUNCTIONS FOR LU MATRIX INVERSE
 
+#############################################################################################################
 
-#### INITIAL FUNCTION  ####################################################################
 def pivot_matrix(M):
     """Returns the pivoting matrix for M, used in Doolittle's method."""
     assert(M.shape[0]==M.shape[1])
@@ -23,14 +22,86 @@ def pivot_matrix(M):
 
     # Rearrange the identity matrix such that the largest element of
     # each column of M is placed on the diagonal of M
-    #for j in range(n): # last step j=n-1 is unusefull cause row will be equal to j
-    for j in range(n-1):
+    for j in range(n):
         row = max(range(j, n), key=lambda i: abs(M[i,j]))
         if j != row:
             # Swap the rows
             id_mat[[j, row]] = id_mat[[row, j]]
 
     return id_mat
+
+def lu_decomposition(M):
+    """Performs an LU Decomposition of M (which must be square)
+    into PM = LU. The function returns P, L, and U."""
+    assert(M.shape[0]==M.shape[1])
+    n = M.shape[0]
+
+    # Create zero matrices for L and U
+    L = np.zeros((n, n))
+    U = np.zeros((n, n))
+
+    # Create the pivot matrix P and the multiplied matrix PM
+    P = pivot_matrix(M)
+    PM = P @ M
+
+    # Perform the LU Decomposition
+    for j in range(n):
+        # All diagonal entries of L are set to unity
+        L[j, j] = 1.0
+
+        # u_{ij} = a_{ij} - \sum_{k=1}^{i-1} u_{kj} l_{ik}
+        for i in range(j+1):
+            s1 = np.dot(U[0:i, j], L[i,0:i])
+            U[i, j] = PM[i, j] - s1
+
+        # l_{ij} = \frac{1}{u_{jj}} (a_{ij} - \sum_{k=1}^{j-1} u_{kj} l_{ik})
+        for i in range(j, n):
+            s2 = np.dot(U[0:j, j], L[i,0:j])
+            L[i, j] = (PM[i, j] - s2) / U[j, j]
+
+    # PM = LU
+    P= np.transpose(P)
+
+    # now M = PLU
+    return P, L, U
+
+def lu_inverse(P, L, U):
+    n = L.shape[0]
+
+    # Forward substitution: Solve L * Y = P * A for Y
+    Y = np.zeros((n, n))
+    for i in range(n):
+        Y[i, 0] = P[i, 0] / L[0, 0]
+        for j in range(1, n):
+            Y[i, j] = (P[i, j] - np.dot(L[j, :j], Y[i, :j])) / L[j, j]
+
+    # Backward substitution: Solve U * X = Y for X
+    X = np.zeros((n, n))
+    for i in range(n - 1, -1, -1):
+        X[i, -1] = Y[i, -1] / U[-1, -1]
+        for j in range(n - 2, -1, -1):
+            X[i, j] = (Y[i, j] - np.dot(U[j, j+1:], X[i, j+1:])) / U[j, j]
+
+    return np.transpose(X)
+
+def matrix_inverse(M):
+    P, L, U = lu_decomposition(M)
+    return lu_inverse(P, L, U) 
+
+def test_matrix_inverse(n, m=100):
+    for i in range(m):
+        M = np.random.uniform(0, 100, (n,n))
+        M_inv = sc.linalg.inv(M)
+        M_inv_2 = matrix_inverse(M)
+        error = np.mean(np.abs(M_inv_2 - M_inv))
+        assert(error < 0.00001)
+
+    print('test_matrix_inverse OK')
+
+
+########################################################################################
+#                                   PIVOT MATRIX
+########################################################################################
 
 
 def map_2D_list(list2D, function):
@@ -49,8 +120,6 @@ def qf_argmax(indices, qfloats):
 
     return maxi
 
-
-
 def qf_pivot_matrix(M):
     """
     Returns the pivoting matrix for M, used in Doolittle's method.
@@ -59,14 +128,12 @@ def qf_pivot_matrix(M):
     assert(len(M)==len(M[0])) # assert this looks like a 2D list of a square matrix
     n = len(M)
 
-    # Create a fhe identity matrix, with fhe integer values
-    pivot_mat = fhe.zeros((n,n))
-    for j in range(n):
-        pivot_mat[j,j] = fhe.ones(1)[0]
+    # Create identity matrix, with fhe integer values
+    pivot_mat = np.identity(n, dtype='int')
 
     # Rearrange the identity matrix such that the largest element of
     # each column of M is placed on the diagonal of M
-    temp_mat = fhe.zeros((n,n))
+    temp_mat = np.zeros((n,n), dtype='int')
     for j in range(n-1):
         # compute argmax of abs values in range(j,n)
         r = qf_argmax( [i for i in range(j, n)], [ abs(M[i][j]) for i in range(j, n)] )
@@ -97,43 +164,6 @@ def qf_pivot_matrix(M):
 ########################################################################################
 #                                   LU DECOMPOSITION
 ########################################################################################
-
-#### INITIAL FUNCTION  ####################################################################
-def lu_decomposition(M):
-    """
-    Performs an LU Decomposition of M (which must be square)
-    into PM = LU. The function returns P, L, and U.
-    """
-    assert(M.shape[0]==M.shape[1])
-    n = M.shape[0]
-
-    # Create zero matrices for L and U
-    L = np.zeros((n, n))
-    U = np.zeros((n, n))
-
-    # Create the pivot matrix P and the multiplied matrix PM
-    P = pivot_matrix(M)
-    PM = P @ M
-
-    # Perform the LU Decomposition
-    for j in range(n):
-        # All diagonal entries of L are set to unity
-        L[j, j] = 1.0
-        # u_{ij} = a_{ij} - \sum_{k=1}^{i-1} u_{kj} l_{ik}
-        for i in range(j+1):
-            s1 = np.dot(U[0:i, j], L[i,0:i])
-            U[i, j] = PM[i, j] - s1            
-
-        # l_{ij} = \frac{1}{u_{jj}} (a_{ij} - \sum_{k=1}^{j-1} u_{kj} l_{ik})
-        for i in range(j, n):
-            s2 = np.dot(U[0:j, j], L[i,0:j])
-            L[i, j] = (PM[i, j] - s2) / U[j, j]
-
-    # PM = LU
-    P= np.transpose(P)
-
-    # now M = PLU
-    return PM, L, U
 
 
 def matrix_column(M,j):
@@ -179,6 +209,12 @@ def transpose_2DList(list2D):
     """
     return [list(row) for row in zip(*list2D)]
 
+def binaryListMatrix(M):
+    """
+    Convert a binary matrix M into a 2D-list matrix of BinaryValues
+    """
+    return map_2D_list( M.tolist(), lambda x: BinaryValue(x) )
+
 def qf_lu_decomposition(M, qf0):
     """
     Performs an LU Decomposition of square QFloats 2D-list matrix M
@@ -194,17 +230,17 @@ def qf_lu_decomposition(M, qf0):
 
     # Initialize 2D-list matrices for L and U
     # (QFloats can be multiplied with integers, this saves computations)
-    L = np.zeros((n,n), dtype='int').tolist()
-    U = np.zeros((n,n), dtype='int').tolist()
+    L = binaryListMatrix(np.zeros((n,n), dtype='int'))
+    U = binaryListMatrix(np.zeros((n,n), dtype='int'))
 
     # Create the pivot matrix P and the multiplied matrix PM
-    P = qf_pivot_matrix(M)
+    P = binaryListMatrix(qf_pivot_matrix(M))
     PM = qf_list_matrix_multiply(P, M, qf0)
 
     # Perform the LU Decomposition
     for j in range(n):
         # All diagonal entries of L are set to unity
-        L[j][j] = 1
+        L[j][j] = BinaryValue(1)
         # u_{ij} = a_{ij} - \sum_{k=1}^{i-1} u_{kj} l_{ik}
         for i in range(j+1):
             if i>0:
@@ -225,7 +261,7 @@ def qf_lu_decomposition(M, qf0):
     P= transpose_2DList(P)
 
     # now M = PLU
-    return PM, L, U
+    return P, L, U
 
 
 
@@ -234,28 +270,6 @@ def qf_lu_decomposition(M, qf0):
 ########################################################################################
 #                                   LU INVERSE
 ########################################################################################
-
-
-#### INITIAL FUNCTION  ####################################################################
-def lu_inverse(P, L, U):
-    n = L.shape[0]
-
-    # Forward substitution: Solve L * Y = P * A for Y
-    Y = np.zeros((n, n))
-    for i in range(n):
-        Y[i, 0] = P[i, 0] / L[0, 0]
-        for j in range(1, n):
-            Y[i][j] = (P[i][j] - np.dot(L[j][:j], Y[i][:j])) / L[j][j]
-
-    # Backward substitution: Solve U * X = Y for X
-    X = np.zeros((n, n))
-    for i in range(n - 1, -1, -1):
-        X[i][-1] = Y[i][-1] / U[-1][-1]
-        for j in range(n - 2, -1, -1):
-            X[i][j] = (Y[i][j] - np.dot(U[j][j+1:], X[i][j+1:])) / U[j][j]
-
-    return np.transpose(X)
-
 
 def qf_lu_inverse(P, L, U, qf0):
     n = len(L)
@@ -282,12 +296,6 @@ def qf_lu_inverse(P, L, U, qf0):
 ########################################################################################
 #                                   INVERSE FUNCTION
 ########################################################################################
-
-
-#### INITIAL FUNCTION  ####################################################################
-def matrix_inverse(M):
-    P, L, U = lu_decomposition(M)
-    return lu_inverse(P, L, U)
 
 
 def float_matrix_to_qfloat_arrays(M, qf_len, qf_ints, qf_base):
@@ -347,8 +355,10 @@ def qfloat_matrix_to_arrays(M, qf_len, qf_ints, qf_base):
         for j in range(n):
             if isinstance(M[i][j], QFloat):
                 qf_arrays[index,:] = M[i][j].toArray()
+            elif isinstance(M[i][j], BinaryValue):
+                qf_arrays[index,qf_ints-1] = M[i][j].value
             else:
-                qf_arrays[index,qf_ints-1] = M[i][j]                
+                qf_arrays[index,qf_ints-1] = M[i][j]
             index += 1
 
     return qf_arrays
@@ -370,10 +380,10 @@ def qf_matrix_inverse(qf_arrays, qf_signs, params):
     qf0 = QFloat.zero(qf_len, qf_ints, qf_base)
 
     # compute the LU decomposition
-    qf_P, qf_L, qf_U = qf_lu_decomposition(qf_M, qf0)
+    bin_P, qf_L, qf_U = qf_lu_decomposition(qf_M, qf0)
 
     # compute inverse from P L U
-    qf_Minv = qf_lu_inverse(qf_P, qf_L, qf_U, qf0)
+    qf_Minv = qf_lu_inverse(bin_P, qf_L, qf_U, qf0)
 
     # break the resulting QFloats into arrays:
     qf_arrays_out = qfloat_matrix_to_arrays(qf_Minv, qf_len, qf_ints, qf_base)
@@ -385,17 +395,6 @@ def qf_matrix_inverse(qf_arrays, qf_signs, params):
 #                                   TESTS
 ########################################################################################
 
-
-#### INITIAL FUNCTION  ####################################################################
-def test_matrix_inverse(n, m=100):
-    for i in range(m):
-        M = np.random.uniform(0, 100, (n,n))
-        M_inv = sc.linalg.inv(M)
-        M_inv_2 = matrix_inverse(M)
-        error = np.mean(np.abs(M_inv_2 - M_inv))
-        assert(error < 0.00001)
-
-    print('test_matrix_inverse OK')
 
 
 def measure_time(function, descripton, *inputs):
@@ -460,11 +459,59 @@ def test_qf_fhe(n, circuit, qf_len, qf_ints, qf_base, simulate=False):
     Minv = matrix_inverse(M)
     print(Minv)
 
-    # Convert output to floats
-    # output_mat = qfloat_arrays_to_float_matrix(qf_arrays, qf_signs, qf_ints, qf_base)
 
-    # print(output_mat) 
-    # print(pivot_matrix(M))
+def test_qf_PLU(n, qf_len, qf_ints, qf_base):
+    # gen random matrix
+    M = np.random.uniform(0, 100, (n,n))
+
+    # convert it to QFloat arrays
+    qf_arrays, qf_signs = float_matrix_to_qfloat_arrays(M, qf_len, qf_ints, qf_base)
+
+    # reconstruct the matrix of QFloats 
+    qf_M = qfloat_arrays_to_QFloat_matrix(qf_arrays, qf_signs, qf_ints, qf_base)
+    # a zero QFloat with good format
+    qf0 = QFloat.zero(qf_len, qf_ints, qf_base)
+
+    # compute the LU decomposition
+    bin_P, qf_L, qf_U = qf_lu_decomposition(qf_M, qf0)
+
+    # convert bin_P from binaryValue to floats
+    P = np.array( map_2D_list(bin_P, lambda x: x.value) )
+
+    # break the resulting QFloats into arrays:
+    qf_arrays_L = qfloat_matrix_to_arrays(qf_L, qf_len, qf_ints, qf_base)
+    qf_arrays_U = qfloat_matrix_to_arrays(qf_U, qf_len, qf_ints, qf_base)
+
+    L = qfloat_arrays_to_float_matrix(qf_arrays_L, qf_ints, qf_base)
+    U = qfloat_arrays_to_float_matrix(qf_arrays_U, qf_ints, qf_base)
+
+    print(' PIVOT MATRIX\n============')
+    print('QFloat P :')
+    print(P)
+    print(' ')
+
+    P_, L_, U_ = lu_decomposition(M)
+    print('PLU P :')
+    print(P_)
+    print('') 
+   
+    print(' L MATRIX\n============')
+    print('QFloat L :')
+    print(L)
+    print(' ')
+
+    print('QFloat L :')
+    print(L_)
+    print(' ')
+
+    print(' U MATRIX\n============')
+    print('QFloat U :')
+    print(U)
+    print(' ')
+
+    print('PLU U :')
+    print(U_)
+    print(' ') 
 
 
 def test_qf_python(n):
@@ -488,11 +535,16 @@ def test_qf_python(n):
 
     qf_Res = qfloat_arrays_to_float_matrix(output, qf_ints, qf_base)
 
+    print('QFloat inverse :')
     print(qf_Res)
     print(' ')
 
-    Minv = matrix_inverse(M)
-    print(Minv)    
+    print('LU inveres :')
+    print(matrix_inverse(M))
+    print(' ') 
+
+    print('Scipy inv :')    
+    print(sc.linalg.inv(M))    
 
 
 if __name__ == '__main__':
@@ -503,8 +555,8 @@ if __name__ == '__main__':
     qf_ints = 9
     qf_base = 2
 
-    circuit_n = compile_circuit(n, qf_len, qf_ints, qf_base)
-    test_qf_fhe(2, circuit, qf_len, qf_ints, qf_base, False)
+    # circuit_n = compile_circuit(n, qf_len, qf_ints, qf_base)
+    # test_qf_fhe(2, circuit, qf_len, qf_ints, qf_base, False)
 
     #results for 16, 9, 2
     # |  Compiling : 821.14 s  |
@@ -513,3 +565,7 @@ if __name__ == '__main__':
     # [-8.0078125 -6.015625 ]]
     # [[ 3.67352128  2.88504985]
     # [-8.35026665 -6.28577699]]    
+
+    #test_qf_python(n)
+    #test_matrix_inverse(3,100)
+    test_qf_PLU(n, qf_len, qf_ints, qf_base)
