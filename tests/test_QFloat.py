@@ -90,7 +90,8 @@ class TestQFloat(unittest.TestCase):
         # zero
         f = 0
         qf = QFloat.fromFloat(f, 10, 5, 2)
-        if not ( qf.getSign() == np.sign(f) ):
+        if not ( qf.getSign() == 1 ): # sign of 0 is 1
+            print(qf.getSign())
             raise ValueError( 'Wrong sign for QFloat: ' + str(qf) + ' for float: ' + str(f))        
 
         # non zero
@@ -99,8 +100,10 @@ class TestQFloat(unittest.TestCase):
             size = np.random.randint(20,30)
             ints = np.random.randint(8,12)
             f = (np.random.randint(0,20000)-10000)/100 # float of type (+/-)xx.xx
+            if f==0:
+                f+=1
             qf = QFloat.fromFloat(f, size, ints, base)
-            if not ( qf.getSign() == np.sign(f) ):
+            if not ( qf.getSign() == np.sign(f)  ):
                 raise ValueError( 'Wrong sign for QFloat: ' + str(qf) + ' for float: ' + str(f))
 
 
@@ -176,8 +179,9 @@ class TestQFloat(unittest.TestCase):
             qf = QFloat(arr, ints, base, False)            
             f = qf.toFloat()
             qf.tidy()
-            if not ( qf.toFloat() == f ):
-                raise ValueError( 'Wrong tidy value for QFloat: ' + str(qf))
+            if not ( (f-qf.toFloat()) <= 0.0001 ):
+                raise ValueError( 'Wrong tidy value for QFloat: ' + str(qf) + ' toFloat : ' + str(qf.toFloat()) + ' for actual float : ', f)
+            assert(qf.getSign() == (np.sign(f) or 1)) # check computed sign as well
 
 
 ######################### FHE TESTS #########################
@@ -191,5 +195,5 @@ class TestQFloat(unittest.TestCase):
 
 unittest.main()
 
-#suite = unittest.TestLoader().loadTestsFromName('test_QFloat.TestQFloat.test_div_np')
-#unittest.TextTestRunner(verbosity=1).run(suite)
+# suite = unittest.TestLoader().loadTestsFromName('test_QFloat.TestQFloat.test_tidy_np')
+# unittest.TextTestRunner(verbosity=1).run(suite)

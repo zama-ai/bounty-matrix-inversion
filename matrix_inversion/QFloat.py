@@ -63,12 +63,12 @@ def float_to_base_p(f, precision, p):
         basep.append(0)
     return sgn*np.array(basep)
 
-def base_p_subtraction(a, b, p):
+def base_p_subtraction_overflow(a, b, p):
     """
-    Subtract arrays in base p. (a and b must be tidy, postive with a > b)
-    Also, if they have different sizes, the longer array is considered to have extra zeros to the left
+    Subtract arrays in base p. (a and b must be tidy)
+    If a and b have different sizes, the longer array is considered to have extra zeros to the left
+    If a < b, the result is wrong and full of ones on the left part, so we can return as well wether a < b
     """
-
     difference = fhe.zeros(a.size)
     borrow = 0
     for i in range(min(a.size,b.size)):
@@ -76,7 +76,14 @@ def base_p_subtraction(a, b, p):
         temp = a[-i-1] - b[-i-1] - borrow
         borrow = temp < 0
         difference[-i-1] = temp + p*borrow
-    return difference
+    return difference, borrow    
+
+def base_p_subtraction(a, b, p):
+    """
+    Subtract arrays in base p. (a and b must be tidy, postive with a >= b)
+    Also, if they have different sizes, the longer array is considered to have extra zeros to the left
+    """
+    return base_p_subtraction_overflow(a,b,p)[0]
 
 def base_p_division(dividend, divisor, p):
     """
@@ -95,19 +102,96 @@ def base_p_division(dividend, divisor, p):
             remainder = np.concatenate((remainder[d:], dividend[i].reshape(1)), axis=0)
         # If the remainder is larger than or equal to the divisor
         for j in range(p-1):
-            is_ge = is_greater_or_equal_difflen(remainder, divisor)
+            # subtraction, is_lower = base_p_subtraction_overflow(remainder, divisor, p)
+            # is_ge = 1-is_lower
+            # # Subtract the divisor from the remainder if remainder >= divisor
+            # remainder = is_ge*subtraction + is_lower*remainder
+            # # Set the current quotient bit to 1
+            # quotient[i] += is_ge
+
+            is_ge = is_greater_or_equal_base_p(remainder, divisor)
             # Subtract the divisor from the remainder
             remainder = is_ge*base_p_subtraction(remainder, divisor, p) + (1-is_ge)*remainder
             # Set the current quotient bit to 1
-            quotient[i] += is_ge
+            quotient[i] += is_ge            
 
-    return quotient    
+    return quotient   
 
+# def base_p_division_fp(dividend, divisor, p, fp):
+#     """
+#     Divide arrays in base p. (dividend and divisor must be tidy and positive)
+#     Optimized for fp (float prevision fp) where we consider that the fp first 
+#     digits of the result should be zeros, (else it would be an overflow) and
+#     so start with a biger remainder of size fp
+#     """    
+#     # Initialize the quotient array
+#     quotient = fhe.zeros(dividend.size)
+#     # Initialize the remainder
+#     remainder = dividend[0:fp]
 
-def is_greater_or_equal_difflen(A, B):
+#     for i in range(fp,dividend.size):
+#         if i>0:
+#             # Left-roll the remainder and bring down the next bit from the dividend
+#             # also cut remainder if its size is bigger than divisor's, cause there are extra zeros
+#             d=1*(remainder.size > divisor.size)
+#             remainder = np.concatenate((remainder[d:], dividend[i].reshape(1)), axis=0)
+#         # If the remainder is larger than or equal to the divisor
+#         for j in range(p-1): 
+#             is_ge = is_greater_or_equal_base_p(remainder, divisor)
+#             # Subtract the divisor from the remainder
+#             remainder = is_ge*base_p_subtraction(remainder, divisor, p) + (1-is_ge)*remainder
+#             # Set the current quotient bit to 1
+#             quotient[i] += is_ge
+
+#     return quotient      
+
+def is_greater_or_equal(a, b):
     """
-    Computes wether an array is greater or equal than another, in alphabetical order
-    Optimized for array of different sizes
+    Fast computation of wether an array number a is greater or equal to an array number b (both must be base tidy)
+    (See base_p_subtraction algorithm to understand why it works)
+    """
+    borrow = 0
+    for i in range(min(a.size,b.size)):
+        # report borrow
+        borrow = a[-i-1] - b[-i-1] - borrow < 0
+    return 1-borrow  
+
+# def is_greater_or_equal(A, B):
+#     """
+#     Computes wether an array is greater or equal than another, in alphabetical order
+
+#     An array A is greater or equal than an array B if and only if:
+#     for all index i:  either  A[i] >= B[i]  or  there is an index k<i where A[k] > B[k]
+#     """    
+#     n = A.size
+
+#     ## compute A[i] >= B[i] array
+#     ge_array = A >= B
+    
+#     ## compute A[i] > B[i] array
+#     gt_array = A > B 
+
+#     ## compute "there is an index k<i where A[i] > B[i]" array in cum_gt_array:
+#     # if gt_array[k] is 1 for some k, cum_gt_array[i] will be 1 for all i>k
+#     cum_gt_array = fhe.zeros(n)
+#     if n >1:
+#         cum_gt_array[1] = gt_array[0]
+#     else:
+#         return ge_array[0] # special case if array has size one
+
+#     for i in range(2,n):
+#         cum_gt_array[i] = cum_gt_array[i-1] | gt_array[i-1]
+
+#     ## now compute " A[i] >= B[i]  or  there is an index k<i where A[i] > B[i] " array in or_array:
+#     or_array = ge_array | cum_gt_array
+
+#     ## return wether or_array is true for all indices
+#     return (n - np.sum(or_array))==0
+
+
+def is_greater_or_equal_base_p(A, B):
+    """
+    Computes wether a base-p number (little endian) is greater or equal than another, works for different sizes
     """    
     diff=B.size-A.size
     if diff==0:
@@ -116,39 +200,6 @@ def is_greater_or_equal_difflen(A, B):
         return is_greater_or_equal(A, B[diff:]) & (np.sum(B[0:diff])==0)
     else:
         return is_greater_or_equal(A[-diff:], B) | (np.sum(A[0:-diff])>0)
-
-
-def is_greater_or_equal(A, B):
-    """
-    Computes wether an array is greater or equal than another, in alphabetical order
-
-    An array A is greater or equal than an array B if and only if:
-    for all index i:  either  A[i] >= B[i]  or  there is an index k<i where A[k] > B[k]
-    """    
-    n = A.size
-
-    ## compute A[i] >= B[i] array
-    ge_array = A >= B
-    
-    ## compute A[i] > B[i] array
-    gt_array = A > B 
-
-    ## compute "there is an index k<i where A[i] > B[i]" array in cum_gt_array:
-    # if gt_array[k] is 1 for some k, cum_gt_array[i] will be 1 for all i>k
-    cum_gt_array = fhe.zeros(n)
-    if n >1:
-        cum_gt_array[1] = gt_array[0]
-    else:
-        return ge_array[0] # special case if array has size one
-
-    for i in range(2,n):
-        cum_gt_array[i] = cum_gt_array[i-1] | gt_array[i-1]
-
-    ## now compute " A[i] >= B[i]  or  there is an index k<i where A[i] > B[i] " array in or_array:
-    or_array = ge_array | cum_gt_array
-
-    ## return wether or_array is true for all indices
-    return (n - np.sum(or_array))==0
 
 
 
@@ -166,7 +217,7 @@ class QFloat():
 
     def __init__(self, array, ints=None, base=2, isTidy=True, sign=None):
         """
-        - array can be encrypted or not
+        - array can be encrypted or not, it must represent a number in base p (little endian)
         - ints gives the number of digits before the dot, so ints = 1 will encode a number like x.xxxx...
         - isTidy: wether the array is already tidy
         - sign: provide the sign if it is already known (usefull in FHE to save computations)
@@ -270,8 +321,9 @@ class QFloat():
         array = fhe.zeros(length)
         array[0:ints] = intArray
         array[ints:] = floatArray
+        sign = np.sign(f) or 1 # zero has sign 1
 
-        return QFloat(array, ints, base, True, np.sign(f))
+        return QFloat(array, ints, base, True, sign)
 
     def toFloat(self):
         """
@@ -288,9 +340,9 @@ class QFloat():
 
 
     #=============================================================================================
-    #                                 Functions for both encrypted or unencrypted QFloats
+    #                      Functions for both encrypted or unencrypted QFloats
     #
-    #       Function with (self,other) can work for mixed encrypted and unencrypted arrays
+    #       Functions with (self,other) can work for mixed encrypted and unencrypted arrays
     #=============================================================================================
 
     def zero(length, ints, base):
@@ -299,7 +351,7 @@ class QFloat():
         """
         if not (isinstance(length, int) and length > 0):
             raise ValueError('length must be a positive int')
-        return QFloat(fhe.zeros(length), ints, base, True, fhe.zeros(1)[0])
+        return QFloat(fhe.zeros(length), ints, base, True, fhe.ones(1)[0])
 
     def zero_like(other):
         """
@@ -308,7 +360,7 @@ class QFloat():
         if not isinstance(other, QFloat):
             raise ValueError('Object must be a QFloat')
 
-        return QFloat.zero(len(other), other._ints, other._base, )
+        return QFloat.zero(len(other), other._ints, other._base, True, fhe.ones(1)[0])
 
     def one(length, ints, base):
         """
@@ -325,7 +377,7 @@ class QFloat():
         if not isinstance(other, QFloat):
             raise ValueError('Object must be a QFloat')
 
-        return QFloat.one(len(other), other._ints, other._base)
+        return QFloat.one(len(other), other._ints, other._base, True, fhe.ones(1)[0])
 
     def copy(self):
         """
@@ -364,30 +416,19 @@ class QFloat():
         """
         Return the sign of the QFloat
         Note: 0 is considered positive for faster computations
-
-        When the QFloat is base tidy, its sign is the the same as the sign of first non zero integer
-        in its array, or 0 if the array is null
         """
-        if self._sign is not None:
-            return self._sign
+        if self._sign is None:
+            # base tidy so that sign can be computed from the first non zero number:
+            self.baseTidy()
 
-        self.baseTidy()
+            # most efficient way to compute the sign of the first non zero number:
+            borrow = 0
+            for i in range(self._array.size):
+                borrow = self._array[-i-1] - borrow < 0
 
-        # compute array signs and zeros
-        signs = np.sign(self._array)
-        is_zero = signs==0
-        is_not_zero = signs!=0
+            self._sign = 2*(1-borrow)-1
 
-        sign = signs[0]
-        notfound = is_zero[0] 
-        for i in range(1, signs.size):
-            change = is_not_zero[i] & notfound
-            not_change = (1-change)
-            sign = change*signs[i] + not_change*sign
-            notfound = notfound & not_change
-
-        self._sign = sign # avoid computing is several times
-        return sign
+        return self._sign
 
     def baseTidy(self):
         """
@@ -399,9 +440,10 @@ class QFloat():
 
         dividend = fhe.zeros(1)[0]
         for i in reversed(range(len(self))):
-            self._array[i] += dividend
-            dividend = (np.abs(self._array[i]) // self._base)*np.sign(self._array[i])
-            self._array[i] -= dividend*self._base
+            curr = self._array[i]+dividend
+            dividend = (np.abs(curr) // self._base)*np.sign(curr)
+            curr -= dividend*self._base
+            self._array[i] = curr
 
         self._isBaseTidy = True
 
@@ -427,9 +469,11 @@ class QFloat():
         P =  self._array*(self._array >= 0)
         absN = -1*(self._array*(self._array < 0))
 
-        isPositive = self.getSign() >=0
-        self._array = isPositive*base_p_subtraction(P,absN,self._base) - (1-isPositive)*base_p_subtraction(absN,P,self._base)
+        P_minus_absN, isNegative = base_p_subtraction_overflow(P, absN, self._base)
+        isPositiveOr0 = (1-isNegative)
+        self._array = isPositiveOr0*P_minus_absN - isNegative*base_p_subtraction(absN,P,self._base)
 
+        self._sign = 2*isPositiveOr0-1
         self._isTidy=True
 
     def __len__(self):
