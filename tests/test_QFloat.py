@@ -119,6 +119,14 @@ class TestQFloat(unittest.TestCase):
             f1 = (np.random.randint(0,20000)-10000)/100 # float of type (+/-)xx.xx
             f2 = (np.random.randint(0,20000)-10000)/100 # float of type (+/-)xx.xx
             qf1 = QFloat.fromFloat(f1, size, ints, base)
+            assert( (2+qf1).toFloat() - (2+f1) < 0.1)
+            assert( (qf1+2).toFloat() - (2+f1) < 0.1)
+            assert( (BinaryValue(1)+qf1).toFloat() - (1+f1) < 0.1)
+
+            assert( (2-qf1).toFloat() - (2-f1) < 0.1)
+            assert( (qf1-2).toFloat() - (f1-2) < 0.1)
+            assert( (BinaryValue(1)-qf1).toFloat() - (1-f1) < 0.1)            
+
             qf2 = QFloat.fromFloat(f2, size, ints, base)
             assert( (qf1+qf2).toFloat()-(f1+f2) < 0.1 )
             assert( (qf1-qf2).toFloat()-(f1-f2) < 0.1 )

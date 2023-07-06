@@ -538,10 +538,10 @@ class QFloat():
         if isinstance(other, fhe.tracing.tracer.Tracer) or isinstance(other, numbers.Integral):
             # Add a single integer
             addition = QFloat( self._array, self._ints, self._base, False)
-            addition._array[self._int-1]+=other
+            addition._array[self._ints-1]+=other
         elif isinstance(other, BinaryValue):
             addition = QFloat( self._array, self._ints, self._base, False)
-            addition._array[self._int-1]+=other.value
+            addition._array[self._ints-1]+=other.value
         else:
             self.checkCompatibility(other)
             addition = QFloat(self._array + other._array, self._ints, self._base, False)
@@ -565,9 +565,9 @@ class QFloat():
         """
         if isinstance(other, fhe.tracing.tracer.Tracer) or isinstance(other, numbers.Integral):
             # Add a single integer
-            self._array[self._int-1]+=other
+            self._array[self._ints-1]+=other
         elif isinstance(other, BinaryValue):
-            self._array[self._int-1]+=other.value        
+            self._array[self._ints-1]+=other.value        
         else:
             self.checkCompatibility(other)
             self._array += other._array
@@ -589,10 +589,10 @@ class QFloat():
         """
         if isinstance(other, fhe.tracing.tracer.Tracer) or isinstance(other, numbers.Integral):
             subtraction = QFloat( self._array, self._ints, self._base, False)
-            subtraction._array[self._int-1]-=other
+            subtraction._array[self._ints-1]-=other
         elif isinstance(other, BinaryValue):
             subtraction = QFloat( self._array, self._ints, self._base, False)
-            subtraction._array[self._int-1]-=other.value
+            subtraction._array[self._ints-1]-=other.value
         else:
             self.checkCompatibility(other)
             subtraction = QFloat(self._array - other._array, self._ints, self._base, False)
