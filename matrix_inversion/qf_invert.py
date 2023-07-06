@@ -8,9 +8,10 @@ from concrete import fhe
 
 #############################################################################################################
 
-#                               ORIGINAL FUNCTIONS FOR LU MATRIX INVERSE
+#                       ORIGINAL FUNCTIONS FOR LU MATRIX INVERSE (for comparison)
 
 #############################################################################################################
+
 
 def pivot_matrix(M):
     """Returns the pivoting matrix for M, used in Doolittle's method."""
@@ -99,78 +100,50 @@ def test_matrix_inverse(n, m=100):
     print('test_matrix_inverse OK')
 
 
-########################################################################################
-#                                   PIVOT MATRIX
-########################################################################################
-
-
-def map_2D_list(list2D, function):
-    return [[function(f) for f in row] for row in list2D]
-
-def qf_argmax(indices, qfloats):
-    """
-    Returns the index corresponding to the biggest QFloat in the list
-    """
-    maxQf = qfloats[0].copy()
-    maxi = indices[0] 
-    for i in range(1,len(indices)):
-        is_gt = qfloats[i] > maxQf
-        maxQf._array = is_gt*qfloats[i]._array + (1-is_gt)*maxQf._array
-        maxi = is_gt*indices[i] + (1-is_gt)*maxi
-
-    return maxi
-
-def qf_pivot_matrix(M):
-    """
-    Returns the pivoting matrix for M, used in Doolittle's method.
-    M is a squared 2D list of QFloats
-    """
-    assert(len(M)==len(M[0])) # assert this looks like a 2D list of a square matrix
-    n = len(M)
-
-    # Create identity matrix, with fhe integer values
-    pivot_mat = np.identity(n, dtype='int')
-
-    # Rearrange the identity matrix such that the largest element of
-    # each column of M is placed on the diagonal of M
-    temp_mat = np.zeros((n,n), dtype='int')
-    for j in range(n-1):
-        # compute argmax of abs values in range(j,n)
-        r = qf_argmax( [i for i in range(j, n)], [ abs(M[i][j]) for i in range(j, n)] )
-
-        # copy pivot_mat to temp_mat
-        temp_mat[:] = pivot_mat[:]
-
-        # swap rows in pivot_mat:
-        # row j becomes row r:
-        bsum = temp_mat[j,:]*(j==r)
-        for i in range(j+1,n):
-            bsum += temp_mat[i,:]*(i==r)
-
-        pivot_mat[j,:] = bsum[:]
-
-        # row r becomes row j:
-        for jj in range(j+1,n):
-          jj_eq_r = jj==r
-          pivot_mat[jj,:] = (1-jj_eq_r)*temp_mat[jj,:] + jj_eq_r*temp_mat[j,:]
-
-    return pivot_mat    
 
 
 
+
+
+
+
+
+
+#############################################################################################################
+
+#                       FUNCTIONS FOR LU MATRIX INVERSE ADAPTED TO QFLOATS
+
+#############################################################################################################
 
 
 
 ########################################################################################
-#                                   LU DECOMPOSITION
+#                                     UTILS
 ########################################################################################
-
 
 def matrix_column(M,j):
     """
     Extract column from 2D list matrix
     """
     return [row[j] for row in M] 
+
+def transpose_2DList(list2D):
+    """
+    Transpose a 2D-list matrix
+    """
+    return [list(row) for row in zip(*list2D)]
+
+def map_2D_list(list2D, function):
+    """
+    Apply a function to a 2D list
+    """
+    return [[function(f) for f in row] for row in list2D]
+
+def binaryListMatrix(M):
+    """
+    Convert a binary matrix M into a 2D-list matrix of BinaryValues
+    """
+    return map_2D_list( M.tolist(), lambda x: BinaryValue(x) )    
 
 def qf_list_dot_product(list1, list2, qf0):
     """
@@ -182,7 +155,7 @@ def qf_list_dot_product(list1, list2, qf0):
     result = qf0.copy() # copy the zero QFloat for initialization
 
     for i in range(len(list1)):
-        if isinstance(list1[i], fhe.tracing.tracer.Tracer): # multiply a QFloat with a Tracer, not the opposite
+        if isinstance(list1[i], fhe.tracing.tracer.Tracer) or isinstance(list1[i], BinaryValue):
             result += (list2[i] * list1[i]) # in place addition is supported    
         else:
             result += (list1[i] * list2[i]) # in place addition is supported
@@ -202,100 +175,6 @@ def qf_list_matrix_multiply(matrix1, matrix2, qf0):
             result[i][j] = qf_list_dot_product( matrix1[i], matrix_column(matrix2,j) , qf0)
     
     return result
-
-def transpose_2DList(list2D):
-    """
-    Transpose a 2D-list matrix
-    """
-    return [list(row) for row in zip(*list2D)]
-
-def binaryListMatrix(M):
-    """
-    Convert a binary matrix M into a 2D-list matrix of BinaryValues
-    """
-    return map_2D_list( M.tolist(), lambda x: BinaryValue(x) )
-
-def qf_lu_decomposition(M, qf0):
-    """
-    Performs an LU Decomposition of square QFloats 2D-list matrix M
-    The function returns P, L, and U such that M = PLU. 
-    """
-    assert(len(M)==len(M[0]))
-    n = len(M)
-
-    # add __len__ function to fhe.tracing.tracer.Tracer for simplicity:
-    def arrlen(self):
-        return self.shape[0]
-    fhe.tracing.tracer.Tracer.__len__ = arrlen
-
-    # Initialize 2D-list matrices for L and U
-    # (QFloats can be multiplied with integers, this saves computations)
-    L = binaryListMatrix(np.zeros((n,n), dtype='int'))
-    U = binaryListMatrix(np.zeros((n,n), dtype='int'))
-
-    # Create the pivot matrix P and the multiplied matrix PM
-    P = binaryListMatrix(qf_pivot_matrix(M))
-    PM = qf_list_matrix_multiply(P, M, qf0)
-
-    # Perform the LU Decomposition
-    for j in range(n):
-        # All diagonal entries of L are set to unity
-        L[j][j] = BinaryValue(1)
-        # u_{ij} = a_{ij} - \sum_{k=1}^{i-1} u_{kj} l_{ik}
-        for i in range(j+1):
-            if i>0:
-                s1 = qf_list_dot_product([U[k][j] for k in range(0,i)], [ L[i][k] for k in range(0,i) ], qf0)
-                U[i][j] = PM[i][j] - s1
-            else:
-                U[i][j] = PM[i][j].copy()
-
-        # l_{ij} = \frac{1}{u_{jj}} (a_{ij} - \sum_{k=1}^{j-1} u_{kj} l_{ik})
-        for i in range(j, n):
-            if j>0:
-                s2 = qf_list_dot_product([U[k][j] for k in range(0,j)], [L[i][k] for k in range(0,j)], qf0)
-                L[i][j] = (PM[i][j] - s2) / U[j][j]
-            else:
-                L[i][j] = PM[i][j] / U[j][j]
-
-    # PM = LU
-    P= transpose_2DList(P)
-
-    # now M = PLU
-    return P, L, U
-
-
-
-
-
-########################################################################################
-#                                   LU INVERSE
-########################################################################################
-
-def qf_lu_inverse(P, L, U, qf0):
-    n = len(L)
-
-    # Forward substitution: Solve L * Y = P * A for Y
-    Y = np.zeros((n,n), dtype='int').tolist()
-    for i in range(n):
-        Y[i][0] = P[i][0] / L[0][0]
-        for j in range(1, n):
-            Y[i][j] = (P[i][j] - qf_list_dot_product([ L[j][k] for k in range(j) ], [ Y[i][k] for k in range(j)], qf0)) / L[j][j]
-
-    # Backward substitution: Solve U * X = Y for X
-    X = np.zeros((n,n), dtype='int').tolist()
-    for i in range(n - 1, -1, -1):
-        X[i][-1] = Y[i][-1] / U[-1][-1]
-        for j in range(n - 2, -1, -1):
-            X[i][j] = (Y[i][j] - qf_list_dot_product( [ U[j][k] for k in range(j+1,n)], [ X[i][k] for k in range(j+1,n) ], qf0)) / U[j][j]
-
-    return transpose_2DList(X)
-
-
-
-
-########################################################################################
-#                                   INVERSE FUNCTION
-########################################################################################
 
 
 def float_matrix_to_qfloat_arrays(M, qf_len, qf_ints, qf_base):
@@ -363,6 +242,142 @@ def qfloat_matrix_to_arrays(M, qf_len, qf_ints, qf_base):
 
     return qf_arrays
 
+########################################################################################
+#                                   PIVOT MATRIX
+########################################################################################
+
+def qf_argmax(indices, qfloats):
+    """
+    Returns the index corresponding to the biggest QFloat in the list
+    """
+    maxQf = qfloats[0].copy()
+    maxi = indices[0] 
+    for i in range(1,len(indices)):
+        is_gt = qfloats[i] > maxQf
+        maxQf._array = is_gt*qfloats[i]._array + (1-is_gt)*maxQf._array
+        maxi = is_gt*indices[i] + (1-is_gt)*maxi
+
+    return maxi
+
+def qf_pivot_matrix(M):
+    """
+    Returns the pivoting matrix for M, used in Doolittle's method.
+    M is a squared 2D list of QFloats
+    """
+    assert(len(M)==len(M[0])) # assert this looks like a 2D list of a square matrix
+    n = len(M)
+
+    # Create identity matrix, with fhe integer values
+    pivot_mat = np.identity(n, dtype='int')
+
+    # Rearrange the identity matrix such that the largest element of
+    # each column of M is placed on the diagonal of M
+    temp_mat = np.zeros((n,n), dtype='int')
+    for j in range(n-1):
+        # compute argmax of abs values in range(j,n)
+        r = qf_argmax( [i for i in range(j, n)], [ abs(M[i][j]) for i in range(j, n)] )
+
+        # copy pivot_mat to temp_mat
+        temp_mat[:] = pivot_mat[:]
+
+        # swap rows in pivot_mat:
+        # row j becomes row r:
+        bsum = temp_mat[j,:]*(j==r)
+        for i in range(j+1,n):
+            bsum += temp_mat[i,:]*(i==r)
+
+        pivot_mat[j,:] = bsum[:]
+
+        # row r becomes row j:
+        for jj in range(j+1,n):
+          jj_eq_r = jj==r
+          pivot_mat[jj,:] = (1-jj_eq_r)*temp_mat[jj,:] + jj_eq_r*temp_mat[j,:]
+
+    return pivot_mat    
+
+
+
+########################################################################################
+#                                   LU DECOMPOSITION
+########################################################################################
+
+def qf_lu_decomposition(M, qf0):
+    """
+    Performs an LU Decomposition of square QFloats 2D-list matrix M
+    The function returns P, L, and U such that M = PLU. 
+    """
+    assert(len(M)==len(M[0]))
+    n = len(M)
+
+    # add __len__ function to fhe.tracing.tracer.Tracer for simplicity:
+    def arrlen(self):
+        return self.shape[0]
+    fhe.tracing.tracer.Tracer.__len__ = arrlen
+
+    # Initialize 2D-list matrices for L and U
+    # (QFloats can be multiplied with integers, this saves computations)
+    L = binaryListMatrix(np.zeros((n,n), dtype='int'))
+    U = binaryListMatrix(np.zeros((n,n), dtype='int'))
+
+    # Create the pivot matrix P and the multiplied matrix PM
+    P = binaryListMatrix(qf_pivot_matrix(M))
+    PM = qf_list_matrix_multiply(P, M, qf0)
+
+    # Perform the LU Decomposition
+    for j in range(n):
+        # All diagonal entries of L are set to unity
+        L[j][j] = BinaryValue(1)
+        # u_{ij} = a_{ij} - \sum_{k=1}^{i-1} u_{kj} l_{ik}
+        for i in range(j+1):
+            if i>0:
+                s1 = qf_list_dot_product([U[k][j] for k in range(0,i)], [ L[i][k] for k in range(0,i) ], qf0)
+                U[i][j] = PM[i][j] - s1
+            else:
+                U[i][j] = PM[i][j].copy()
+
+        # l_{ij} = \frac{1}{u_{jj}} (a_{ij} - \sum_{k=1}^{j-1} u_{kj} l_{ik})
+        for i in range(j, n):
+            if j>0:
+                s2 = qf_list_dot_product([U[k][j] for k in range(0,j)], [L[i][k] for k in range(0,j)], qf0)
+                L[i][j] = (PM[i][j] - s2) / U[j][j]
+            else:
+                L[i][j] = PM[i][j] / U[j][j]
+
+    # PM = LU
+    P= transpose_2DList(P)
+
+    # now M = PLU
+    return P, L, U
+
+
+########################################################################################
+#                                   LU INVERSE
+########################################################################################
+
+def qf_lu_inverse(P, L, U, qf0):
+    n = len(L)
+
+    # Forward substitution: Solve L * Y = P * A for Y
+    Y = np.zeros((n,n), dtype='int').tolist()
+    for i in range(n):
+        Y[i][0] = P[i][0] / L[0][0]
+        for j in range(1, n):
+            Y[i][j] = (P[i][j] - qf_list_dot_product([ L[j][k] for k in range(j) ], [ Y[i][k] for k in range(j)], qf0)) / L[j][j]
+
+    # Backward substitution: Solve U * X = Y for X
+    X = np.zeros((n,n), dtype='int').tolist()
+    for i in range(n - 1, -1, -1):
+        X[i][-1] = Y[i][-1] / U[-1][-1]
+        for j in range(n - 2, -1, -1):
+            X[i][j] = (Y[i][j] - qf_list_dot_product( [ U[j][k] for k in range(j+1,n)], [ X[i][k] for k in range(j+1,n) ], qf0)) / U[j][j]
+
+    return transpose_2DList(X)
+
+
+
+########################################################################################
+#                                   INVERSE FUNCTION
+########################################################################################
 
 def qf_matrix_inverse(qf_arrays, qf_signs, params):
     """
@@ -386,14 +401,20 @@ def qf_matrix_inverse(qf_arrays, qf_signs, params):
     qf_Minv = qf_lu_inverse(bin_P, qf_L, qf_U, qf0)
 
     # break the resulting QFloats into arrays:
-    qf_arrays_out = qfloat_matrix_to_arrays(qf_Minv, qf_len, qf_ints, qf_base)
+    qf_inv_arrays = qfloat_matrix_to_arrays(qf_Minv, qf_len, qf_ints, qf_base)
 
-    return qf_arrays_out
+    return qf_inv_arrays
 
 
-########################################################################################
-#                                   TESTS
-########################################################################################
+
+
+
+
+#############################################################################################################
+
+#                                                  TESTS
+
+#############################################################################################################
 
 
 
@@ -408,59 +429,10 @@ def measure_time(function, descripton, *inputs):
     return output
 
 
-def compile_circuit(n, qf_len, qf_ints, qf_base):
-
-    # set params
-    params = [n, qf_len, qf_ints, qf_base]
-
-    compiler = fhe.Compiler(lambda x,y: qf_matrix_inverse(x,y,params), {"x": "encrypted", "y": "encrypted"})
-    make_circuit = lambda : compiler.compile(
-        inputset=[
-                (np.random.randint(0, qf_base, size=(n*n, qf_len)),
-                np.random.randint(0, qf_base, size=(n*n,)))
-                for _ in range(100)
-            ],
-        configuration=fhe.Configuration(
-            enable_unsafe_features=True,
-            use_insecure_key_cache=True,
-            insecure_key_cache_location=".keys",
-            #dataflow_parallelize=True,
-        ),
-        verbose=False,
-    )
-
-    circuit = measure_time( make_circuit, 'Compiling')
-    return circuit
-
-
-def test_qf_fhe(n, circuit, qf_len, qf_ints, qf_base, simulate=False):
-    # gen random matrix
-    M = np.random.uniform(0, 100, (n,n))
-
-    # convert it to QFloat arrays
-    qf_arrays, qf_signs = float_matrix_to_qfloat_arrays(M, qf_len, qf_ints, qf_base)
-
-    QFloat.KEEP_TIDY=False
-
-    # Run FHE
-    if not simulate:
-        encrypted = measure_time(circuit.encrypt, 'Encrypting', qf_arrays, qf_signs)
-        run = measure_time(circuit.run,'Running', encrypted)
-        decrypted = circuit.decrypt(run)
-    else:
-        decrypted = measure_time(circuit.simulate,'Simulating', qf_arrays, qf_signs)
-
-    QFloat.KEEP_TIDY=True
-
-    qf_Res = qfloat_arrays_to_float_matrix(decrypted, qf_ints, qf_base)
-
-    print(qf_Res)
-
-    Minv = matrix_inverse(M)
-    print(Minv)
-
-
-def test_qf_PLU(n, qf_len, qf_ints, qf_base):
+def test_qf_PLU_python(n, qf_len, qf_ints, qf_base):
+    """
+    Test the PLU decomposition using QFloats, in python
+    """
     # gen random matrix
     M = np.random.uniform(0, 100, (n,n))
 
@@ -514,12 +486,12 @@ def test_qf_PLU(n, qf_len, qf_ints, qf_base):
     print(' ') 
 
 
-def test_qf_python(n):
+def test_qf_inverse_python(n, qf_len, qf_ints, qf_base):
+    """
+    Test the matrix inverse using QFloats, in python
+    """
     # gen random matrix
     M = np.random.uniform(0, 100, (n,n))
-    qf_base= 2
-    qf_len = 16
-    qf_ints = 10
 
     # convert it to QFloat arrays
     qf_arrays, qf_signs = float_matrix_to_qfloat_arrays(M, qf_len, qf_ints, qf_base)
@@ -527,11 +499,8 @@ def test_qf_python(n):
     # set params
     params = [n, qf_len, qf_ints, qf_base]
 
-    #QFloat.KEEP_TIDY=False
-
-    output = qf_matrix_inverse(qf_arrays, qf_signs, params)
-
     QFloat.KEEP_TIDY=True
+    output = qf_matrix_inverse(qf_arrays, qf_signs, params)
 
     qf_Res = qfloat_arrays_to_float_matrix(output, qf_ints, qf_base)
 
@@ -547,25 +516,70 @@ def test_qf_python(n):
     print(sc.linalg.inv(M))    
 
 
+def compile_circuit(n, qf_len, qf_ints, qf_base):
+
+    # set params
+    params = [n, qf_len, qf_ints, qf_base]
+
+    compiler = fhe.Compiler(lambda x,y: qf_matrix_inverse(x,y,params), {"x": "encrypted", "y": "encrypted"})
+    make_circuit = lambda : compiler.compile(
+        inputset=[
+                (np.random.randint(0, qf_base, size=(n*n, qf_len)),
+                np.random.randint(0, qf_base, size=(n*n,)))
+                for _ in range(100)
+            ],
+        configuration=fhe.Configuration(
+            enable_unsafe_features=True,
+            use_insecure_key_cache=True,
+            insecure_key_cache_location=".keys",
+            #dataflow_parallelize=True,
+        ),
+        verbose=False,
+    )
+
+    circuit = measure_time( make_circuit, 'Compiling')
+    return circuit
+
+
+def test_qf_inverse_fhe(n, circuit, qf_len, qf_ints, qf_base, simulate=False):
+    # gen random matrix
+    M = np.random.uniform(0, 100, (n,n))
+
+    # convert it to QFloat arrays
+    qf_arrays, qf_signs = float_matrix_to_qfloat_arrays(M, qf_len, qf_ints, qf_base)
+
+    QFloat.KEEP_TIDY=False
+
+    # Run FHE
+    if not simulate:
+        encrypted = measure_time(circuit.encrypt, 'Encrypting', qf_arrays, qf_signs)
+        run = measure_time(circuit.run,'Running', encrypted)
+        decrypted = circuit.decrypt(run)
+    else:
+        decrypted = measure_time(circuit.simulate,'Simulating', qf_arrays, qf_signs)
+
+    QFloat.KEEP_TIDY=True
+
+    qf_Res = qfloat_arrays_to_float_matrix(decrypted, qf_ints, qf_base)
+
+    print(qf_Res)
+
+    Minv = matrix_inverse(M)
+    print(Minv)
+
+
 if __name__ == '__main__':
-    #test_qf_python(3)
 
     n=2
-    qf_len = 16
+    qf_len = 20
     qf_ints = 9
     qf_base = 2
 
     # circuit_n = compile_circuit(n, qf_len, qf_ints, qf_base)
-    # test_qf_fhe(2, circuit, qf_len, qf_ints, qf_base, False)
+    # test_qf_inverse_fhe(2, circuit, qf_len, qf_ints, qf_base, False)
 
     #results for 16, 9, 2
-    # |  Compiling : 821.14 s  |
-    # |  Simulating : 0.57 s  |
-    # [[ 3.5625     2.796875 ]
-    # [-8.0078125 -6.015625 ]]
-    # [[ 3.67352128  2.88504985]
-    # [-8.35026665 -6.28577699]]    
 
-    #test_qf_python(n)
-    #test_matrix_inverse(3,100)
-    test_qf_PLU(n, qf_len, qf_ints, qf_base)
+
+    #test_qf_PLU_python(n, qf_len, qf_ints, qf_base)
+    test_qf_inverse_python(n, qf_len, qf_ints, qf_base)

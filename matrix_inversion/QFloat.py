@@ -165,6 +165,8 @@ def is_greater_or_equal_base_p(A, B):
         return is_greater_or_equal(A[-diff:], B) | (np.sum(A[0:-diff])>0)
 
 
+
+
 class BinaryValue():
     """
     A simple class to differentiate binary values from others, usefull in QFloat.__mul__
@@ -662,7 +664,7 @@ class QFloat():
 
     def __mul__(self, other):
         """
-        Multiply with another QFLoat or integer, see __imul__
+        Multiply with another QFLoat or number, see __imul__
         """
         multiplication = self.copy()
         multiplication *= other
