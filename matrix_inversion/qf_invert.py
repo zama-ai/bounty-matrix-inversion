@@ -4,7 +4,7 @@ import time
 from QFloat import QFloat, BinaryValue
 from concrete import fhe
 
-
+Tracer = fhe.tracing.tracer.Tracer
 
 #############################################################################################################
 
@@ -143,26 +143,22 @@ def binaryListMatrix(M):
     """
     Convert a binary matrix M into a 2D-list matrix of BinaryValues
     """
-    return map_2D_list( M.tolist(), lambda x: BinaryValue(x) )    
+    return map_2D_list( [[M[i,j] for j in range(M.shape[1])] for i in range(M.shape[0]) ], lambda x: BinaryValue(x) )    
 
-def qf_list_dot_product(list1, list2, qf0):
+def qf_list_dot_product(list1, list2):
     """
     Dot product of two QFloat lists
     """
     if len(list1) != len(list2):
         raise ValueError("Lists should have the same length.")
     
-    result = qf0.copy() # copy the zero QFloat for initialization
-
-    for i in range(len(list1)):
-        if isinstance(list1[i], fhe.tracing.tracer.Tracer) or isinstance(list1[i], BinaryValue):
-            result += (list2[i] * list1[i]) # in place addition is supported    
-        else:
-            result += (list1[i] * list2[i]) # in place addition is supported
+    result = list1[0] * list2[0]
+    for i in range(1,len(list1)):
+        result += (list1[i] * list2[i]) # in place addition is supported
     
     return result
 
-def qf_list_matrix_multiply(matrix1, matrix2, qf0):
+def qf_list_matrix_multiply(matrix1, matrix2):
     """
     Multiply two matrices of int or QFloats
     """
@@ -172,7 +168,7 @@ def qf_list_matrix_multiply(matrix1, matrix2, qf0):
 
     for i in range(len(matrix1)):
         for j in range(len(matrix2[0])):
-            result[i][j] = qf_list_dot_product( matrix1[i], matrix_column(matrix2,j) , qf0)
+            result[i][j] = qf_list_dot_product( matrix1[i], matrix_column(matrix2,j))
     
     return result
 
@@ -268,11 +264,13 @@ def qf_pivot_matrix(M):
     n = len(M)
 
     # Create identity matrix, with fhe integer values
-    pivot_mat = np.identity(n, dtype='int')
+    pivot_mat = fhe.zeros((n,n))
+    for i in range(n):
+        pivot_mat[i,i] = fhe.ones(1)[0]
 
     # Rearrange the identity matrix such that the largest element of
     # each column of M is placed on the diagonal of M
-    temp_mat = np.zeros((n,n), dtype='int')
+    temp_mat = fhe.zeros((n,n))
     for j in range(n-1):
         # compute argmax of abs values in range(j,n)
         r = qf_argmax( [i for i in range(j, n)], [ abs(M[i][j]) for i in range(j, n)] )
@@ -301,7 +299,7 @@ def qf_pivot_matrix(M):
 #                                   LU DECOMPOSITION
 ########################################################################################
 
-def qf_lu_decomposition(M, qf0):
+def qf_lu_decomposition(M):
     """
     Performs an LU Decomposition of square QFloats 2D-list matrix M
     The function returns P, L, and U such that M = PLU. 
@@ -309,10 +307,10 @@ def qf_lu_decomposition(M, qf0):
     assert(len(M)==len(M[0]))
     n = len(M)
 
-    # add __len__ function to fhe.tracing.tracer.Tracer for simplicity:
+    # add __len__ function to Tracer for simplicity:
     def arrlen(self):
         return self.shape[0]
-    fhe.tracing.tracer.Tracer.__len__ = arrlen
+    Tracer.__len__ = arrlen
 
     # Initialize 2D-list matrices for L and U
     # (QFloats can be multiplied with integers, this saves computations)
@@ -321,7 +319,7 @@ def qf_lu_decomposition(M, qf0):
 
     # Create the pivot matrix P and the multiplied matrix PM
     P = binaryListMatrix(qf_pivot_matrix(M))
-    PM = qf_list_matrix_multiply(P, M, qf0)
+    PM = qf_list_matrix_multiply(P, M)
 
     # Perform the LU Decomposition
     for j in range(n):
@@ -330,7 +328,7 @@ def qf_lu_decomposition(M, qf0):
         # u_{ij} = a_{ij} - \sum_{k=1}^{i-1} u_{kj} l_{ik}
         for i in range(j+1):
             if i>0:
-                s1 = qf_list_dot_product([U[k][j] for k in range(0,i)], [ L[i][k] for k in range(0,i) ], qf0)
+                s1 = qf_list_dot_product([U[k][j] for k in range(0,i)], [ L[i][k] for k in range(0,i) ])
                 U[i][j] = PM[i][j] - s1
             else:
                 U[i][j] = PM[i][j].copy()
@@ -338,7 +336,7 @@ def qf_lu_decomposition(M, qf0):
         # l_{ij} = \frac{1}{u_{jj}} (a_{ij} - \sum_{k=1}^{j-1} u_{kj} l_{ik})
         for i in range(j, n):
             if j>0:
-                s2 = qf_list_dot_product([U[k][j] for k in range(0,j)], [L[i][k] for k in range(0,j)], qf0)
+                s2 = qf_list_dot_product([U[k][j] for k in range(0,j)], [L[i][k] for k in range(0,j)])
                 L[i][j] = (PM[i][j] - s2) / U[j][j]
             else:
                 L[i][j] = PM[i][j] / U[j][j]
@@ -354,7 +352,7 @@ def qf_lu_decomposition(M, qf0):
 #                                   LU INVERSE
 ########################################################################################
 
-def qf_lu_inverse(P, L, U, qf0):
+def qf_lu_inverse(P, L, U):
     n = len(L)
 
     # Forward substitution: Solve L * Y = P * A for Y
@@ -362,14 +360,14 @@ def qf_lu_inverse(P, L, U, qf0):
     for i in range(n):
         Y[i][0] = P[i][0] / L[0][0]
         for j in range(1, n):
-            Y[i][j] = (P[i][j] - qf_list_dot_product([ L[j][k] for k in range(j) ], [ Y[i][k] for k in range(j)], qf0)) / L[j][j]
+            Y[i][j] = (P[i][j] - qf_list_dot_product([ L[j][k] for k in range(j) ], [ Y[i][k] for k in range(j)])) / L[j][j]
 
     # Backward substitution: Solve U * X = Y for X
     X = np.zeros((n,n), dtype='int').tolist()
     for i in range(n - 1, -1, -1):
         X[i][-1] = Y[i][-1] / U[-1][-1]
         for j in range(n - 2, -1, -1):
-            X[i][j] = (Y[i][j] - qf_list_dot_product( [ U[j][k] for k in range(j+1,n)], [ X[i][k] for k in range(j+1,n) ], qf0)) / U[j][j]
+            X[i][j] = (Y[i][j] - qf_list_dot_product( [ U[j][k] for k in range(j+1,n)], [ X[i][k] for k in range(j+1,n) ])) / U[j][j]
 
     return transpose_2DList(X)
 
@@ -391,14 +389,11 @@ def qf_matrix_inverse(qf_arrays, qf_signs, params):
     # reconstruct the matrix of QFloats with encrypted values:
     qf_M = qfloat_arrays_to_QFloat_matrix(qf_arrays, qf_signs, qf_ints, qf_base)
 
-    # a zero QFloat with good format
-    qf0 = QFloat.zero(qf_len, qf_ints, qf_base)
-
     # compute the LU decomposition
-    bin_P, qf_L, qf_U = qf_lu_decomposition(qf_M, qf0)
+    bin_P, qf_L, qf_U = qf_lu_decomposition(qf_M)
 
     # compute inverse from P L U
-    qf_Minv = qf_lu_inverse(bin_P, qf_L, qf_U, qf0)
+    qf_Minv = qf_lu_inverse(bin_P, qf_L, qf_U)
 
     # break the resulting QFloats into arrays:
     qf_inv_arrays = qfloat_matrix_to_arrays(qf_Minv, qf_len, qf_ints, qf_base)
@@ -441,11 +436,9 @@ def test_qf_PLU_python(n, qf_len, qf_ints, qf_base):
 
     # reconstruct the matrix of QFloats 
     qf_M = qfloat_arrays_to_QFloat_matrix(qf_arrays, qf_signs, qf_ints, qf_base)
-    # a zero QFloat with good format
-    qf0 = QFloat.zero(qf_len, qf_ints, qf_base)
 
     # compute the LU decomposition
-    bin_P, qf_L, qf_U = qf_lu_decomposition(qf_M, qf0)
+    bin_P, qf_L, qf_U = qf_lu_decomposition(qf_M)
 
     # convert bin_P from binaryValue to floats
     P = np.array( map_2D_list(bin_P, lambda x: x.value) )
@@ -516,10 +509,12 @@ def test_qf_inverse_python(n, qf_len, qf_ints, qf_base):
     print(sc.linalg.inv(M))    
 
 
-def compile_circuit(n, qf_len, qf_ints, qf_base):
+def compile_circuit(n, qf_len, qf_ints, qf_base, keep_tidy=True):
 
     # set params
     params = [n, qf_len, qf_ints, qf_base]
+
+    QFloat.KEEP_TIDY=keep_tidy
 
     compiler = fhe.Compiler(lambda x,y: qf_matrix_inverse(x,y,params), {"x": "encrypted", "y": "encrypted"})
     make_circuit = lambda : compiler.compile(
@@ -537,6 +532,8 @@ def compile_circuit(n, qf_len, qf_ints, qf_base):
         verbose=False,
     )
 
+    QFloat.KEEP_TIDY=True
+
     circuit = measure_time( make_circuit, 'Compiling')
     return circuit
 
@@ -548,8 +545,6 @@ def test_qf_inverse_fhe(n, circuit, qf_len, qf_ints, qf_base, simulate=False):
     # convert it to QFloat arrays
     qf_arrays, qf_signs = float_matrix_to_qfloat_arrays(M, qf_len, qf_ints, qf_base)
 
-    QFloat.KEEP_TIDY=False
-
     # Run FHE
     if not simulate:
         encrypted = measure_time(circuit.encrypt, 'Encrypting', qf_arrays, qf_signs)
@@ -557,8 +552,6 @@ def test_qf_inverse_fhe(n, circuit, qf_len, qf_ints, qf_base, simulate=False):
         decrypted = circuit.decrypt(run)
     else:
         decrypted = measure_time(circuit.simulate,'Simulating', qf_arrays, qf_signs)
-
-    QFloat.KEEP_TIDY=True
 
     qf_Res = qfloat_arrays_to_float_matrix(decrypted, qf_ints, qf_base)
 
@@ -576,10 +569,10 @@ if __name__ == '__main__':
     qf_base = 2
 
     # circuit_n = compile_circuit(n, qf_len, qf_ints, qf_base)
-    # test_qf_inverse_fhe(2, circuit, qf_len, qf_ints, qf_base, False)
+    # test_qf_inverse_fhe(n, circuit, qf_len, qf_ints, qf_base, False, False)
 
     #results for 16, 9, 2
 
-
     #test_qf_PLU_python(n, qf_len, qf_ints, qf_base)
     test_qf_inverse_python(n, qf_len, qf_ints, qf_base)
+

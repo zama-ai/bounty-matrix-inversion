@@ -2,6 +2,7 @@ import numpy as np
 import numbers
 from concrete import fhe
 
+Tracer = fhe.tracing.tracer.Tracer
 
 #=======================================================================================================================
 #                            Functions operating on arrays in base p (p=2 means binary)
@@ -198,10 +199,10 @@ class QFloat():
         - isTidy: wether the array is already tidy
         - sign: provide the sign if it is already known (usefull in FHE to save computations)
         """
-        if not (isinstance(array, np.ndarray) or isinstance(array, fhe.tracing.tracer.Tracer)):
-            raise ValueError('array must be np.ndarray or fhe.tracing.tracer.Tracer')
+        if not (isinstance(array, np.ndarray) or isinstance(array, Tracer)):
+            raise ValueError('array must be np.ndarray or Tracer')
 
-        self._encrypted = isinstance(array, fhe.tracing.tracer.Tracer)
+        self._encrypted = isinstance(array, Tracer)
 
         if len(array.shape) > 1:
             raise ValueError('array must be one dimension')
@@ -537,7 +538,7 @@ class QFloat():
         Summing will potentially make values in the sum array be greater than the base and not tidy, so isTidy becomes False
         Hence we need to tidy the sum if requested
         """
-        if isinstance(other, fhe.tracing.tracer.Tracer) or isinstance(other, numbers.Integral):
+        if isinstance(other, Tracer) or isinstance(other, numbers.Integral):
             # Add a single integer
             addition = QFloat( self._array, self._ints, self._base, False)
             addition._array[self._ints-1]+=other
@@ -559,18 +560,26 @@ class QFloat():
         """
         return self.__add__(other)
 
+    def checkFHECompatibility(self, condition):
+        if not self._encrypted and condition:
+            raise ValueError('Cannot combine unencrypted with encrypted')
+
     def __iadd__(self, other):
         """
         Sum with another QFLoat or single integer, in place
         Summing will potentially make values in the sum array be greater than the base and not tidy, so isTidy becomes False
         Hence we need to tidy if requested
         """
-        if isinstance(other, fhe.tracing.tracer.Tracer) or isinstance(other, numbers.Integral):
+        if isinstance(other, Tracer) or isinstance(other, numbers.Integral):
+            self.checkFHECompatibility(isinstance(other, Tracer))
             # Add a single integer
             self._array[self._ints-1]+=other
         elif isinstance(other, BinaryValue):
+            self.checkFHECompatibility(isinstance(other.value, Tracer))
             self._array[self._ints-1]+=other.value        
         else:
+            self.checkFHECompatibility(other._encrypted)
+
             self.checkCompatibility(other)
             self._array += other._array
 
@@ -589,7 +598,7 @@ class QFloat():
         Subtracting will potentially make values in the sum array be greater than the base and not tidy, so isTidy becomes False
         Hence we need to tidy the subtraction if requested
         """
-        if isinstance(other, fhe.tracing.tracer.Tracer) or isinstance(other, numbers.Integral):
+        if isinstance(other, Tracer) or isinstance(other, numbers.Integral):
             subtraction = QFloat( self._array, self._ints, self._base, False)
             subtraction._array[self._ints-1]-=other
         elif isinstance(other, BinaryValue):
@@ -618,7 +627,8 @@ class QFloat():
 
         WARNING: precision of multiplication does not increase, so it may overflow if not enough
         """
-        if isinstance(other, fhe.tracing.tracer.Tracer) or isinstance(other, numbers.Integral):
+        if isinstance(other, Tracer) or isinstance(other, numbers.Integral):
+            self.checkFHECompatibility(isinstance(other, Tracer))
             # multiply everything by a single integer
             self._array *= other
             self._isTidy=False
@@ -626,6 +636,7 @@ class QFloat():
             if self._sign is not None:
                 self._sign = self._sign*np.sign(other)
         elif isinstance(other, BinaryValue):
+            self.checkFHECompatibility(isinstance(other.value, Tracer))
             # multiply everything by a binary value, which keeps the array tidy
             self._array *= other.value
             #self._isTidy and self._isBaseTidy are not impacted here
@@ -633,6 +644,7 @@ class QFloat():
                 self._sign = self._sign*np.sign(other.value)            
         else:
             # multiply with another compatible QFloat 
+            self.checkFHECompatibility(other._encrypted)
             self.checkCompatibility(other)
 
             # A QFloat array is made of 2 parts, integer part and float part
@@ -666,8 +678,15 @@ class QFloat():
         """
         Multiply with another QFLoat or number, see __imul__
         """
-        multiplication = self.copy()
-        multiplication *= other
+        if not self._encrypted and not (isinstance(other, numbers.Integral) or (isinstance(other, BinaryValue) and isinstance(other.value, numbers.Integral))):
+            if(isinstance(other, Tracer) or isinstance(other, BinaryValue) ):
+                raise ValueError('Cannot multiply unencrypted with encrypted number')
+            multiplication = other.copy()
+            multiplication *= self
+        else:
+            multiplication = self.copy()
+            multiplication *= other
+
         return multiplication
 
     def __rmul__(self, other):
@@ -695,23 +714,23 @@ class QFloat():
         WARNING: precision of division does not increase
         """
         # first, create a QFloat if other is a number:
-        if isinstance(other, fhe.tracing.tracer.Tracer) or isinstance(other, numbers.Integral):
-            qf = QFloat.one(len(self), self._ints, self._base, encrypted=isinstance(other, fhe.tracing.tracer.Tracer))
+        if isinstance(other, Tracer) or isinstance(other, numbers.Integral):
+            #self.checkFHECompatibility(isinstance(other, Tracer))
+            qf = QFloat.one(len(self), self._ints, self._base, encrypted=isinstance(other, Tracer))
             qf._array[self._ints-1]*=other
             qf.tidy()
             other=qf
         elif isinstance(other, BinaryValue):
-            qf = QFloat.one(len(self), self._ints, self._base, encrypted=isinstance(other.value, fhe.tracing.tracer.Tracer))
+            #self.checkFHECompatibility(isinstance(other.value, Tracer))
+            qf = QFloat.one(len(self), self._ints, self._base, encrypted=isinstance(other.value, Tracer))
             qf._array[self._ints-1]*=other.value
-            qf.tidy()
             other = qf
         else:
-            self.checkCompatibility(other)
+            #self.checkFHECompatibility(other._encrypted)
             other.tidy()
 
         self.checkCompatibility(other)
         self.tidy()
-        other.tidy()
 
         # get signs and make arrays positive
         signa = self.getSign()
@@ -748,15 +767,17 @@ class QFloat():
         Return other divided by self
         """
         # first, create a QFloat if other is a number:
-        if isinstance(other, fhe.tracing.tracer.Tracer) or isinstance(other, numbers.Integral):
-            qf = QFloat.one(len(self), self._ints, self._base, encrypted=isinstance(other, fhe.tracing.tracer.Tracer))
+        if isinstance(other, Tracer) or isinstance(other, numbers.Integral):
+            qf = QFloat.one(len(self), self._ints, self._base, encrypted=isinstance(other, Tracer))
             qf._array[self._ints-1]*=other
-            qf.tidy()
+            qf._sign *= np.sign(other)
+            qf.baseTidy()
             other=qf
         elif isinstance(other, BinaryValue):
-            qf = QFloat.one(len(self), self._ints, self._base, encrypted=isinstance(other.value, fhe.tracing.tracer.Tracer))
+            qf = QFloat.one(len(self), self._ints, self._base, encrypted=isinstance(other.value, Tracer))
             qf._array[self._ints-1]*=other.value
-            qf.tidy()
+            qf._sign *= np.sign(other.value)
+            qf.baseTidy()
             other = qf
         
         return other / self
