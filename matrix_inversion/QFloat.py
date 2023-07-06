@@ -67,7 +67,7 @@ def base_p_subtraction_overflow(a, b, p):
     """
     Subtract arrays in base p. (a and b must be tidy)
     If a and b have different sizes, the longer array is considered to have extra zeros to the left
-    If a < b, the result is wrong and full of ones on the left part, so we can return as well wether a < b
+    If a < b, the result is wrong and full of ones on the left part, so we can return in addition wether a < b
     """
     difference = fhe.zeros(a.size)
     borrow = 0
@@ -102,18 +102,11 @@ def base_p_division(dividend, divisor, p):
             remainder = np.concatenate((remainder[d:], dividend[i].reshape(1)), axis=0)
         # If the remainder is larger than or equal to the divisor
         for j in range(p-1):
-            # subtraction, is_lower = base_p_subtraction_overflow(remainder, divisor, p)
-            # is_ge = 1-is_lower
-            # # Subtract the divisor from the remainder if remainder >= divisor
-            # remainder = is_ge*subtraction + is_lower*remainder
-            # # Set the current quotient bit to 1
-            # quotient[i] += is_ge
-
             is_ge = is_greater_or_equal_base_p(remainder, divisor)
             # Subtract the divisor from the remainder
             remainder = is_ge*base_p_subtraction(remainder, divisor, p) + (1-is_ge)*remainder
             # Set the current quotient bit to 1
-            quotient[i] += is_ge            
+            quotient[i] += is_ge
 
     return quotient   
 
@@ -155,39 +148,6 @@ def is_greater_or_equal(a, b):
         # report borrow
         borrow = a[-i-1] - b[-i-1] - borrow < 0
     return 1-borrow  
-
-# def is_greater_or_equal(A, B):
-#     """
-#     Computes wether an array is greater or equal than another, in alphabetical order
-
-#     An array A is greater or equal than an array B if and only if:
-#     for all index i:  either  A[i] >= B[i]  or  there is an index k<i where A[k] > B[k]
-#     """    
-#     n = A.size
-
-#     ## compute A[i] >= B[i] array
-#     ge_array = A >= B
-    
-#     ## compute A[i] > B[i] array
-#     gt_array = A > B 
-
-#     ## compute "there is an index k<i where A[i] > B[i]" array in cum_gt_array:
-#     # if gt_array[k] is 1 for some k, cum_gt_array[i] will be 1 for all i>k
-#     cum_gt_array = fhe.zeros(n)
-#     if n >1:
-#         cum_gt_array[1] = gt_array[0]
-#     else:
-#         return ge_array[0] # special case if array has size one
-
-#     for i in range(2,n):
-#         cum_gt_array[i] = cum_gt_array[i-1] | gt_array[i-1]
-
-#     ## now compute " A[i] >= B[i]  or  there is an index k<i where A[i] > B[i] " array in or_array:
-#     or_array = ge_array | cum_gt_array
-
-#     ## return wether or_array is true for all indices
-#     return (n - np.sum(or_array))==0
-
 
 def is_greater_or_equal_base_p(A, B):
     """

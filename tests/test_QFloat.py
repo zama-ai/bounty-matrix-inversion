@@ -154,7 +154,8 @@ class TestQFloat(unittest.TestCase):
             qf1 = QFloat.fromFloat(f1, size, ints, base)
             qf2 = QFloat.fromFloat(f2, size, ints, base)
             div = qf1/qf2
-            assert( div.toFloat()-(f1/f2) < 0.1 )
+            if not( div.toFloat()-(f1/f2) < 0.1 ):
+                raise Exception('Wrong division for f1:' + str(f1) +' f2: ' + str(f2) + ' f1/f2: ' + str(f1/f2) + ' and div : '+str(div.toFloat()))
 
     def test_abs_np(self):
         for i in range(100):
@@ -195,5 +196,5 @@ class TestQFloat(unittest.TestCase):
 
 unittest.main()
 
-# suite = unittest.TestLoader().loadTestsFromName('test_QFloat.TestQFloat.test_tidy_np')
+# suite = unittest.TestLoader().loadTestsFromName('test_QFloat.TestQFloat.test_div_np')
 # unittest.TextTestRunner(verbosity=1).run(suite)
