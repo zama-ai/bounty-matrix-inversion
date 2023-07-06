@@ -1,7 +1,7 @@
 import numpy as np
 import scipy as sc
 import time
-from QFloat import QFloat, BinaryValue
+from QFloat import QFloat, SignedBinary
 from concrete import fhe
 
 Tracer = fhe.tracing.tracer.Tracer
@@ -141,9 +141,9 @@ def map_2D_list(list2D, function):
 
 def binaryListMatrix(M):
     """
-    Convert a binary matrix M into a 2D-list matrix of BinaryValues
+    Convert a binary matrix M into a 2D-list matrix of SignedBinarys
     """
-    return map_2D_list( [[M[i,j] for j in range(M.shape[1])] for i in range(M.shape[0]) ], lambda x: BinaryValue(x) )    
+    return map_2D_list( [[M[i,j] for j in range(M.shape[1])] for i in range(M.shape[0]) ], lambda x: SignedBinary(x) )    
 
 def qf_list_dot_product(list1, list2):
     """
@@ -230,7 +230,7 @@ def qfloat_matrix_to_arrays(M, qf_len, qf_ints, qf_base):
         for j in range(n):
             if isinstance(M[i][j], QFloat):
                 qf_arrays[index,:] = M[i][j].toArray()
-            elif isinstance(M[i][j], BinaryValue):
+            elif isinstance(M[i][j], SignedBinary):
                 qf_arrays[index,qf_ints-1] = M[i][j].value
             else:
                 qf_arrays[index,qf_ints-1] = M[i][j]
@@ -324,7 +324,7 @@ def qf_lu_decomposition(M):
     # Perform the LU Decomposition
     for j in range(n):
         # All diagonal entries of L are set to unity
-        L[j][j] = BinaryValue(1)
+        L[j][j] = SignedBinary(1)
         # u_{ij} = a_{ij} - \sum_{k=1}^{i-1} u_{kj} l_{ik}
         for i in range(j+1):
             if i>0:
@@ -568,7 +568,7 @@ if __name__ == '__main__':
     qf_ints = 9
     qf_base = 2
 
-    # circuit_n = compile_circuit(n, qf_len, qf_ints, qf_base)
+    #circuit_n = compile_circuit(n, qf_len, qf_ints, qf_base)
     # test_qf_inverse_fhe(n, circuit, qf_len, qf_ints, qf_base, False, False)
 
     #results for 16, 9, 2

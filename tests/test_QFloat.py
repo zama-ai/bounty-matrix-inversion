@@ -6,7 +6,7 @@ from concrete import fhe
 
 sys.path.append(os.getcwd())
 
-from matrix_inversion.QFloat import QFloat, BinaryValue
+from matrix_inversion.QFloat import QFloat, SignedBinary
 
 
 SIMULATE=False
@@ -121,11 +121,11 @@ class TestQFloat(unittest.TestCase):
             qf1 = QFloat.fromFloat(f1, size, ints, base)
             assert( (2+qf1).toFloat() - (2+f1) < 0.1)
             assert( (qf1+2).toFloat() - (2+f1) < 0.1)
-            assert( (BinaryValue(1)+qf1).toFloat() - (1+f1) < 0.1)
+            assert( (SignedBinary(1)+qf1).toFloat() - (1+f1) < 0.1)
 
             assert( (2-qf1).toFloat() - (2-f1) < 0.1)
             assert( (qf1-2).toFloat() - (f1-2) < 0.1)
-            assert( (BinaryValue(1)-qf1).toFloat() - (1-f1) < 0.1)            
+            assert( (SignedBinary(1)-qf1).toFloat() - (1-f1) < 0.1)            
 
             qf2 = QFloat.fromFloat(f2, size, ints, base)
             assert( (qf1+qf2).toFloat()-(f1+f2) < 0.1 )
@@ -145,7 +145,7 @@ class TestQFloat(unittest.TestCase):
             qf1 = QFloat.fromFloat(f1, size, ints, base)
             assert( (2*qf1).toFloat() - 2*f1 < 0.1)
             assert( (qf1*2).toFloat() - 2*f1 < 0.1)
-            assert( (BinaryValue(1)*qf1).toFloat() - f1 < 0.1)
+            assert( (SignedBinary(1)*qf1).toFloat() - f1 < 0.1)
             qf2 = QFloat.fromFloat(f2, size, ints, base)
             prod = qf1*qf2
             prod2 = integer*qf2
@@ -171,7 +171,12 @@ class TestQFloat(unittest.TestCase):
 
             assert( (2/qf1).toFloat() - 2/f1 < 0.1)
             assert( (qf1/2).toFloat() - f1/2.0 < 0.1)
-            assert( (BinaryValue(1)/qf1).toFloat() - 1.0/f1 < 0.1)
+
+            print( qf1.toFloat(), (SignedBinary(1)/qf1).toFloat(), (1.0/f1) )
+            assert( (SignedBinary(1)/qf1).toFloat() - 1.0/f1 < 0.1)
+            print( qf1.toFloat(), (SignedBinary(-1)/qf1).toFloat(), (-1.0/f1) )
+            assert( (SignedBinary(-1)/qf1).toFloat() - (-1.0/f1) < 0.1)
+            assert( (qf1/SignedBinary(0)).toFloat() > 1000) #overflow
 
             qf2 = QFloat.fromFloat(f2, size, ints, base)
             div = qf1/qf2

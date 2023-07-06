@@ -168,12 +168,14 @@ def is_greater_or_equal_base_p(A, B):
 
 
 
-class BinaryValue():
+class SignedBinary():
     """
-    A simple class to differentiate binary values from others, usefull in QFloat.__mul__
+    A simple class to differentiate values that we know are binary (+1, -1 or 0) from others
+    It is usefull to save computations for operations with QFloats
     The value can be encrypted or not, as long as it is binary
     """
     def __init__(self, value):
+        # init with a signed binary value (+1, -1 or 0)
         self.value = value
 
 #=======================================================================================================================
@@ -183,7 +185,7 @@ class BinaryValue():
 class QFloat():
     """
     A class for quantizing floats
-    Floats are encoded as encrypted or unencrypted arrays of integers in a specified base (fastest for fhe is binary)
+    Floats are encoded as encrypted or unencrypted arrays of integers in a specified base (the fastest for fhe is base 2)
     Encrypted QFloat can be summed, multiplied etc. with unencrypted QFloats, and vice-versa
     """
 
@@ -542,7 +544,7 @@ class QFloat():
             # Add a single integer
             addition = QFloat( self._array, self._ints, self._base, False)
             addition._array[self._ints-1]+=other
-        elif isinstance(other, BinaryValue):
+        elif isinstance(other, SignedBinary):
             addition = QFloat( self._array, self._ints, self._base, False)
             addition._array[self._ints-1]+=other.value
         else:
@@ -574,7 +576,7 @@ class QFloat():
             self.checkFHECompatibility(isinstance(other, Tracer))
             # Add a single integer
             self._array[self._ints-1]+=other
-        elif isinstance(other, BinaryValue):
+        elif isinstance(other, SignedBinary):
             self.checkFHECompatibility(isinstance(other.value, Tracer))
             self._array[self._ints-1]+=other.value        
         else:
@@ -601,7 +603,7 @@ class QFloat():
         if isinstance(other, Tracer) or isinstance(other, numbers.Integral):
             subtraction = QFloat( self._array, self._ints, self._base, False)
             subtraction._array[self._ints-1]-=other
-        elif isinstance(other, BinaryValue):
+        elif isinstance(other, SignedBinary):
             subtraction = QFloat( self._array, self._ints, self._base, False)
             subtraction._array[self._ints-1]-=other.value
         else:
@@ -635,7 +637,7 @@ class QFloat():
             self._isBaseTidy=False
             if self._sign is not None:
                 self._sign = self._sign*np.sign(other)
-        elif isinstance(other, BinaryValue):
+        elif isinstance(other, SignedBinary):
             self.checkFHECompatibility(isinstance(other.value, Tracer))
             # multiply everything by a binary value, which keeps the array tidy
             self._array *= other.value
@@ -678,8 +680,8 @@ class QFloat():
         """
         Multiply with another QFLoat or number, see __imul__
         """
-        if not self._encrypted and not (isinstance(other, numbers.Integral) or (isinstance(other, BinaryValue) and isinstance(other.value, numbers.Integral))):
-            if(isinstance(other, Tracer) or isinstance(other, BinaryValue) ):
+        if not self._encrypted and not (isinstance(other, numbers.Integral) or (isinstance(other, SignedBinary) and isinstance(other.value, numbers.Integral))):
+            if(isinstance(other, Tracer) or isinstance(other, SignedBinary) ):
                 raise ValueError('Cannot multiply unencrypted with encrypted number')
             multiplication = other.copy()
             multiplication *= self
@@ -699,7 +701,7 @@ class QFloat():
         """
         Negative
         """    
-        return self*BinaryValue(-1)
+        return self*SignedBinary(-1)
 
     def __itruediv__(self, other):
         """
@@ -713,20 +715,24 @@ class QFloat():
         WARNING: dividing by zero will give zero
         WARNING: precision of division does not increase
         """
-        # first, create a QFloat if other is a number:
-        if isinstance(other, Tracer) or isinstance(other, numbers.Integral):
-            #self.checkFHECompatibility(isinstance(other, Tracer))
+
+        if isinstance(other, SignedBinary):
+            self.checkFHECompatibility(isinstance(other.value, Tracer))
+
+            # In this case, the array is either unchanged (just signed), or overflowed (dividing by 0 causes overflow)
+            is_zero = other.value==0
+            sign = other.value # the value is also its sign
+            self._array = (1-is_zero)*sign*self._array + is_zero*fhe.ones(len(self))*(self._base-1)
+            self._sign = sign
+            return self
+
+        elif isinstance(other, Tracer) or isinstance(other, numbers.Integral):
+            # create a QFloat from this number
             qf = QFloat.one(len(self), self._ints, self._base, encrypted=isinstance(other, Tracer))
             qf._array[self._ints-1]*=other
             qf.tidy()
             other=qf
-        elif isinstance(other, BinaryValue):
-            #self.checkFHECompatibility(isinstance(other.value, Tracer))
-            qf = QFloat.one(len(self), self._ints, self._base, encrypted=isinstance(other.value, Tracer))
-            qf._array[self._ints-1]*=other.value
-            other = qf
         else:
-            #self.checkFHECompatibility(other._encrypted)
             other.tidy()
 
         self.checkCompatibility(other)
@@ -772,12 +778,50 @@ class QFloat():
             qf._array[self._ints-1]*=other
             qf._sign *= np.sign(other)
             qf.baseTidy()
-            other=qf
-        elif isinstance(other, BinaryValue):
-            qf = QFloat.one(len(self), self._ints, self._base, encrypted=isinstance(other.value, Tracer))
-            qf._array[self._ints-1]*=other.value
-            qf._sign *= np.sign(other.value)
-            qf.baseTidy()
-            other = qf
-        
-        return other / self
+            return qf / self
+
+        elif isinstance(other, QFloat):
+            return other / self
+
+        elif isinstance(other, SignedBinary):
+            # qf = QFloat.one(len(self), self._ints, self._base, encrypted=isinstance(other.value, Tracer))
+            # qf._array[self._ints-1]*=other.value
+            # qf._sign *= np.sign(other.value)
+            # qf.baseTidy()
+            # other = qf
+
+            # When other is a binary value, we can make a smaller division and save computations
+            self.tidy()
+
+            # get signs and make arrays positive
+
+            signa = other.value # the value is also its sign
+            a = (signa!=0)*fhe.ones(1) # an array with one value to save computations
+
+            signb = self.getSign()
+            b = signb*(self._array)
+
+            # The float precision is the number of digits after the dot:
+            fp = len(self)-self._ints
+
+            # We consider each array as representing integers a and b here
+            # Let's left shit the first array which corresponds by multiplying a by 2*fp (normal shift + decimals):
+            shift_arr = np.concatenate((a, fhe.zeros(2*fp)), axis=0)
+            # Make the integer division (a*fp)/b with our long division algorithm:
+            div_array = base_p_division(shift_arr, b, self._base)
+
+            # Correct size of div_array
+            diff=len(self)-div_array.size
+            if diff>0:
+                div_array = np.concatenate( (fhe.zeros(diff), div_array), axis=0)
+            else:
+                div_array = div_array[-diff:]
+            # The result array encodes for a QFloat with fp precision, which is equivalent to divide the result by fp
+            # giving as expected the number (a * fp) / b / fp :
+            sign=signa*signb
+            division = QFloat(sign*div_array, self._ints, self._base, True, sign)
+
+            return division            
+            
+        else:
+            raise ValueError('Unknown class for other')
