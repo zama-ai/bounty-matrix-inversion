@@ -6,12 +6,16 @@ from concrete import fhe
 
 Tracer = fhe.tracing.tracer.Tracer
 
-#############################################################################################################
 
-#                       ORIGINAL FUNCTIONS FOR LU MATRIX INVERSE (for comparison)
+#============================================================================================================================================
 
-#############################################################################################################
-
+#  ██████  ██████  ██  ██████  ██ ███    ██  █████  ██          ██      ██    ██     ██ ███    ██ ██    ██ ███████ ██████  ███████ ███████ 
+# ██    ██ ██   ██ ██ ██       ██ ████   ██ ██   ██ ██          ██      ██    ██     ██ ████   ██ ██    ██ ██      ██   ██ ██      ██      
+# ██    ██ ██████  ██ ██   ███ ██ ██ ██  ██ ███████ ██          ██      ██    ██     ██ ██ ██  ██ ██    ██ █████   ██████  ███████ █████   
+# ██    ██ ██   ██ ██ ██    ██ ██ ██  ██ ██ ██   ██ ██          ██      ██    ██     ██ ██  ██ ██  ██  ██  ██      ██   ██      ██ ██      
+#  ██████  ██   ██ ██  ██████  ██ ██   ████ ██   ██ ███████     ███████  ██████      ██ ██   ████   ████   ███████ ██   ██ ███████ ███████ 
+                                                                                                                                         
+#============================================================================================================================================                                                                                                                                         
 
 def pivot_matrix(M):
     """Returns the pivoting matrix for M, used in Doolittle's method."""
@@ -109,12 +113,16 @@ def test_matrix_inverse(n, m=100):
 
 
 
-#############################################################################################################
+#============================================================================================================================================
 
-#                       FUNCTIONS FOR LU MATRIX INVERSE ADAPTED TO QFLOATS
+    #  ██████  ███████ ██       ██████   █████  ████████     ███████ ██    ██ ███    ██  ██████ ████████ ██  ██████  ███    ██ ███████ 
+    # ██    ██ ██      ██      ██    ██ ██   ██    ██        ██      ██    ██ ████   ██ ██         ██    ██ ██    ██ ████   ██ ██      
+    # ██    ██ █████   ██      ██    ██ ███████    ██        █████   ██    ██ ██ ██  ██ ██         ██    ██ ██    ██ ██ ██  ██ ███████ 
+    # ██ ▄▄ ██ ██      ██      ██    ██ ██   ██    ██        ██      ██    ██ ██  ██ ██ ██         ██    ██ ██    ██ ██  ██ ██      ██ 
+    #  ██████  ██      ███████  ██████  ██   ██    ██        ██       ██████  ██   ████  ██████    ██    ██  ██████  ██   ████ ███████ 
+    #     ▀▀                                                                                                                           
 
-#############################################################################################################
-
+#============================================================================================================================================
 
 
 ########################################################################################
@@ -374,12 +382,75 @@ def qf_lu_inverse(P, L, U):
 
 
 ########################################################################################
-#                                   INVERSE FUNCTION
+#                                   COMPLETE FUNCTION
 ########################################################################################
+
+def qf_pivot(qf_arrays, qf_signs, params):
+    """
+    computes only the pivot matrix
+    """
+    n, qf_len, qf_ints, qf_base = params
+
+    assert( n*n == qf_arrays.shape[0])
+    assert( qf_len == qf_arrays.shape[1])
+
+    # reconstruct the matrix of QFloats with encrypted values:
+    qf_M = qfloat_arrays_to_QFloat_matrix(qf_arrays, qf_signs, qf_ints, qf_base)
+
+    # compute the LU decomposition
+    P = qf_pivot_matrix(qf_M)
+
+    return P
+
+
+def qf_lu_L(qf_arrays, qf_signs, params):
+    """
+    compute only PLU and returns L
+    """
+    n, qf_len, qf_ints, qf_base = params
+
+    assert( n*n == qf_arrays.shape[0])
+    assert( qf_len == qf_arrays.shape[1])
+
+    # reconstruct the matrix of QFloats with encrypted values:
+    qf_M = qfloat_arrays_to_QFloat_matrix(qf_arrays, qf_signs, qf_ints, qf_base)
+
+    # compute the LU decomposition
+    bin_P, qf_L, qf_U = qf_lu_decomposition(qf_M)    
+
+    # break the resulting QFloats into arrays:
+    qf_inv_arrays_L = qfloat_matrix_to_arrays(qf_L, qf_len, qf_ints, qf_base)    
+    #qf_inv_arrays_U = qfloat_matrix_to_arrays(qf_U, qf_len, qf_ints, qf_base)    
+
+    return qf_inv_arrays_L
+
+
+def qf_lu_U(qf_arrays, qf_signs, params):
+    """
+    compute only PLU and returns U
+    """
+    n, qf_len, qf_ints, qf_base = params
+
+    assert( n*n == qf_arrays.shape[0])
+    assert( qf_len == qf_arrays.shape[1])
+
+    # reconstruct the matrix of QFloats with encrypted values:
+    qf_M = qfloat_arrays_to_QFloat_matrix(qf_arrays, qf_signs, qf_ints, qf_base)
+
+    # compute the LU decomposition
+    bin_P, qf_L, qf_U = qf_lu_decomposition(qf_M)    
+
+    # break the resulting QFloats into arrays:
+    #qf_inv_arrays_L = qfloat_matrix_to_arrays(qf_L, qf_len, qf_ints, qf_base)    
+    qf_inv_arrays_U = qfloat_matrix_to_arrays(qf_U, qf_len, qf_ints, qf_base)    
+
+    return qf_inv_arrays_U
+
+
 
 def qf_matrix_inverse(qf_arrays, qf_signs, params):
     """
-    Main function
+    Compute the whole inverse
     """
     n, qf_len, qf_ints, qf_base = params
 
@@ -407,7 +478,11 @@ def qf_matrix_inverse(qf_arrays, qf_signs, params):
 
 #############################################################################################################
 
-#                                                  TESTS
+                        # ████████ ███████ ███████ ████████ ███████ 
+                        #    ██    ██      ██         ██    ██      
+                        #    ██    █████   ███████    ██    ███████ 
+                        #    ██    ██           ██    ██         ██ 
+                        #    ██    ███████ ███████    ██    ███████ 
 
 #############################################################################################################
 
@@ -424,12 +499,16 @@ def measure_time(function, descripton, *inputs):
     return output
 
 
-def test_qf_PLU_python(n, qf_len, qf_ints, qf_base):
+########################################################################################
+#                                    PYTHON
+########################################################################################
+
+def test_qf_PLU_python(sampler, n, qf_len, qf_ints, qf_base):
     """
     Test the PLU decomposition using QFloats, in python
     """
     # gen random matrix
-    M = np.random.uniform(0, 100, (n,n))
+    M = sampler()
 
     # convert it to QFloat arrays
     qf_arrays, qf_signs = float_matrix_to_qfloat_arrays(M, qf_len, qf_ints, qf_base)
@@ -479,12 +558,12 @@ def test_qf_PLU_python(n, qf_len, qf_ints, qf_base):
     print(' ') 
 
 
-def test_qf_inverse_python(n, qf_len, qf_ints, qf_base):
+def test_qf_inverse_python(sampler, n, qf_len, qf_ints, qf_base):
     """
     Test the matrix inverse using QFloats, in python
     """
     # gen random matrix
-    M = np.random.uniform(0, 100, (n,n))
+    M = sampler()
 
     # convert it to QFloat arrays
     qf_arrays, qf_signs = float_matrix_to_qfloat_arrays(M, qf_len, qf_ints, qf_base)
@@ -497,32 +576,42 @@ def test_qf_inverse_python(n, qf_len, qf_ints, qf_base):
 
     qf_Res = qfloat_arrays_to_float_matrix(output, qf_ints, qf_base)
 
-    print('QFloat inverse :')
+    print('\n==== Test python ====')
+    print('\nQFloat inverse :')
     print(qf_Res)
-    print(' ')
 
-    print('LU inveres :')
-    print(matrix_inverse(M))
-    print(' ') 
+    print('\nLU inveres :')
+    print(matrix_inverse(M)) 
 
-    print('Scipy inv :')    
-    print(sc.linalg.inv(M))    
+    print('\nScipy inv :')    
+    print(sc.linalg.inv(M))   
+
+    print('\nScipy inv int :')    
+    print(sc.linalg.inv(M.astype('int')))       
 
 
-def compile_circuit(n, qf_len, qf_ints, qf_base, keep_tidy=True):
+
+
+########################################################################################
+#                                           FHE
+########################################################################################
+
+def compile_circuit(n, qf_len, qf_ints, qf_base, sampler, keep_tidy=True, circuit_function=qf_matrix_inverse):
 
     # set params
     params = [n, qf_len, qf_ints, qf_base]
 
     QFloat.KEEP_TIDY=keep_tidy
 
-    compiler = fhe.Compiler(lambda x,y: qf_matrix_inverse(x,y,params), {"x": "encrypted", "y": "encrypted"})
+    inputset=[]
+    for i in range(100):
+        M = sampler()
+        qf_arrays, qf_signs = float_matrix_to_qfloat_arrays(M, qf_len, qf_ints, qf_base)
+        inputset.append((qf_arrays, qf_signs))
+
+    compiler = fhe.Compiler(lambda x,y: circuit_function(x,y,params), {"x": "encrypted", "y": "encrypted"})
     make_circuit = lambda : compiler.compile(
-        inputset=[
-                (np.random.randint(0, qf_base, size=(n*n, qf_len)),
-                np.random.randint(0, qf_base, size=(n*n,)))
-                for _ in range(100)
-            ],
+        inputset=inputset,
         configuration=fhe.Configuration(
             enable_unsafe_features=True,
             use_insecure_key_cache=True,
@@ -538,10 +627,7 @@ def compile_circuit(n, qf_len, qf_ints, qf_base, keep_tidy=True):
     return circuit
 
 
-def test_qf_inverse_fhe(n, circuit, qf_len, qf_ints, qf_base, simulate=False):
-    # gen random matrix
-    M = np.random.uniform(0, 100, (n,n))
-
+def run_qf_circuit_fhe(circuit, M, qf_len, qf_ints, qf_base, simulate=False, raw_output=False):
     # convert it to QFloat arrays
     qf_arrays, qf_signs = float_matrix_to_qfloat_arrays(M, qf_len, qf_ints, qf_base)
 
@@ -553,26 +639,69 @@ def test_qf_inverse_fhe(n, circuit, qf_len, qf_ints, qf_base, simulate=False):
     else:
         decrypted = measure_time(circuit.simulate,'Simulating', qf_arrays, qf_signs)
 
-    qf_Res = qfloat_arrays_to_float_matrix(decrypted, qf_ints, qf_base)
+    if not raw_output:
+        qf_Res = qfloat_arrays_to_float_matrix(decrypted, qf_ints, qf_base)
+    else:
+        qf_Res = decrypted
 
+    return qf_Res
+
+def test_qf_pivot_fhe(circuit, sampler, qf_len, qf_ints, qf_base, simulate=False):
+    M = sampler()
+    qf_Res = run_qf_circuit_fhe(circuit, M, qf_len, qf_ints, qf_base, simulate, True)
+    
+    print('QFloat pivot :')
     print(qf_Res)
+    print(' ')
 
-    Minv = matrix_inverse(M)
-    print(Minv)
+    print('LU pivot :')
+    print(pivot_matrix(M))
+    print(' ') 
+
+def test_qf_LU_U_fhe(circuit, sampler, qf_len, qf_ints, qf_base, simulate=False):
+    M = sampler()
+    qf_Res = run_qf_circuit_fhe(circuit, M, qf_len, qf_ints, qf_base, simulate)
+    
+    print('QFloat LU U :')
+    print(qf_Res)
+    print(' ')
+
+    print('LU U :')
+    P,L,U = lu_decomposition(M)
+    print(U)
+    print(' ') 
+
+def test_qf_inverse_fhe(circuit, sampler, qf_len, qf_ints, qf_base, simulate=False):
+    M = sampler()
+    qf_Res = run_qf_circuit_fhe(circuit, M, qf_len, qf_ints, qf_base, simulate)
+
+    print('QFloat inverse :')
+    print(qf_Res)
+    print(' ')
+
+    print('LU inveres :')
+    print(matrix_inverse(M))
+    print(' ') 
+
+    print('Scipy inv :')    
+    print(sc.linalg.inv(M))    
 
 
 if __name__ == '__main__':
 
-    n=2
-    qf_len = 20
-    qf_ints = 9
-    qf_base = 2
+    n=2; qf_len = 16; qf_ints = 9; qf_base = 2
 
-    #circuit_n = compile_circuit(n, qf_len, qf_ints, qf_base)
-    # test_qf_inverse_fhe(n, circuit, qf_len, qf_ints, qf_base, False, False)
+    normal_sampler = ("Normal", lambda: np.random.randn(n, n) * 100)
+    uniform_sampler = ("Uniform", lambda: np.random.uniform(0, 100, (n, n)))
 
-    #results for 16, 9, 2
+    sampler = uniform_sampler[1]
 
-    #test_qf_PLU_python(n, qf_len, qf_ints, qf_base)
-    test_qf_inverse_python(n, qf_len, qf_ints, qf_base)
+    # test pivot in fhe:
+    # ------------------
+    # circuit = compile_circuit(n, qf_len, qf_ints, qf_base, sampler, keep_tidy=False, circuit_function=qf_pivot)
+    # test_qf_pivot_fhe(circuit, sampler, qf_len, qf_ints, qf_base, simulate=False)
 
+    # test LU decomposition in fhe:
+    # -----------------------------
+    circuit = compile_circuit(n, qf_len, qf_ints, qf_base, sampler, keep_tidy=False, circuit_function=qf_lu_U)
+    test_qf_LU_U_fhe(circuit, sampler, qf_len, qf_ints, qf_base, simulate=False)    

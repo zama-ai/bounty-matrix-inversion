@@ -784,12 +784,6 @@ class QFloat():
             return other / self
 
         elif isinstance(other, SignedBinary):
-            # qf = QFloat.one(len(self), self._ints, self._base, encrypted=isinstance(other.value, Tracer))
-            # qf._array[self._ints-1]*=other.value
-            # qf._sign *= np.sign(other.value)
-            # qf.baseTidy()
-            # other = qf
-
             # When other is a binary value, we can make a smaller division and save computations
             self.tidy()
 
