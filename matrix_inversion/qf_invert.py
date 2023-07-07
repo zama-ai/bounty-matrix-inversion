@@ -403,14 +403,17 @@ def qf_lu_inverse(P, L, U):
 #                            2x2 and 3x3 SHORCUT FORMULAS
 ########################################################################################
 
-# def qf_inverse_2x2(qf_M):
-#     """
-#     The inverse of a 2x2 matrix has a simple formla
-#     """
-#     [a, b] = qf_M[0]
-#     [c, d] = qf_M[1]
-#     det_M = a*d - b*c
+def qf_inverse_2x2(qf_M):
+    """
+    The inverse of a 2x2 matrix has a simple formla
+    """
+    [a, b] = qf_M[0]
+    [c, d] = qf_M[1]
+    det_M = a*d - b*c
+    det_M_inv = SignedBinary(1) / det_M
 
+    M_inv = [[det_M_inv*d, -det_M_inv*b], [-det_M_inv*c, -det_M_inv*d]]
+    return M_inv
 
 
 ########################################################################################
@@ -492,15 +495,18 @@ def qf_matrix_inverse(qf_arrays, qf_signs, params):
     # reconstruct the matrix of QFloats with encrypted values:
     qf_M = qfloat_arrays_to_QFloat_matrix(qf_arrays, qf_signs, qf_ints, qf_base)
 
-    # if n=2:
-    #     qf_Minv = qf_inverse_2x2(qf_M)
+    if n==2:
+        # use shortcut formula
+        qf_Minv = qf_inverse_2x2(qf_M)
 
-    # else:
-    # compute the LU decomposition
-    bin_P, qf_L, qf_U = qf_lu_decomposition(qf_M)
+    else:
+        # compute the LU decomposition
+        bin_P, qf_L, qf_U = qf_lu_decomposition(qf_M)
 
-    # compute inverse from P L U
-    qf_Minv = qf_lu_inverse(bin_P, qf_L, qf_U)
+        # compute inverse from P L U
+        qf_Minv = qf_lu_inverse(bin_P, qf_L, qf_U)
+
+    qf_Minv = qf_inverse_2x2(qf_M)        
 
     # break the resulting QFloats into arrays:
     qf_inv_arrays = qfloat_matrix_to_arrays(qf_Minv, qf_len, qf_ints, qf_base)
@@ -752,7 +758,7 @@ def test_qf_inverse_fhe(circuit, sampler, qf_len, qf_ints, qf_base, simulate=Fal
 
 if __name__ == '__main__':
 
-    n=4; qf_len = 20; qf_ints = 9; qf_base = 2
+    n=2; qf_len = 30; qf_ints = 17; qf_base = 2
 
     normal_sampler = ("Normal", lambda: np.random.randn(n, n) * 100)
     uniform_sampler = ("Uniform", lambda: np.random.uniform(0, 100, (n, n)))
@@ -788,8 +794,8 @@ if __name__ == '__main__':
 
     # test inversion in fhe:
     # -----------------------------
-    # QFloat.resetStats()
-    # circuit = compile_circuit(n, qf_len, qf_ints, qf_base, sampler, keep_tidy=False)
-    # QFloat.showStats()
-    # test_qf_inverse_fhe(circuit, sampler, qf_len, qf_ints, qf_base, simulate=False)
+    QFloat.resetStats()
+    circuit = compile_circuit(n, qf_len, qf_ints, qf_base, sampler, keep_tidy=False)
+    QFloat.showStats()
+    test_qf_inverse_fhe(circuit, sampler, qf_len, qf_ints, qf_base, simulate=False)
 
