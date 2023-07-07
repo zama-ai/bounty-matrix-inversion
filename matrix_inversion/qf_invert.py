@@ -372,14 +372,14 @@ def qf_lu_inverse(P, L, U):
     n = len(L)
 
     # Forward substitution: Solve L * Y = P * A for Y
-    Y = L = zeroListMatrix(n)
+    Y = zeroListMatrix(n)
     for i in range(n):
         Y[i][0] = P[i][0] / L[0][0]
         for j in range(1, n):
             Y[i][j] = (P[i][j] - qf_list_dot_product([ L[j][k] for k in range(j) ], [ Y[i][k] for k in range(j)])) / L[j][j]
 
     # Backward substitution: Solve U * X = Y for X
-    X = L = zeroListMatrix(n)
+    X = zeroListMatrix(n)
     for i in range(n - 1, -1, -1):
         X[i][-1] = Y[i][-1] / U[-1][-1]
         for j in range(n - 2, -1, -1):
@@ -724,7 +724,7 @@ def test_qf_inverse_fhe(circuit, sampler, qf_len, qf_ints, qf_base, simulate=Fal
 
 if __name__ == '__main__':
 
-    n=2; qf_len = 16; qf_ints = 9; qf_base = 2
+    n=2; qf_len = 20; qf_ints = 9; qf_base = 2
 
     normal_sampler = ("Normal", lambda: np.random.randn(n, n) * 100)
     uniform_sampler = ("Uniform", lambda: np.random.uniform(0, 100, (n, n)))
@@ -733,27 +733,35 @@ if __name__ == '__main__':
 
     # test inverse qf python
     # ----------------------
-    #test_qf_inverse_python(sampler, n, qf_len, qf_ints, qf_base)
+    QFloat.resetStats()
+    test_qf_inverse_python(sampler, n, qf_len, qf_ints, qf_base)
+    QFloat.showStats()
 
     # test pivot in fhe:
     # ------------------
+    #QFloat.resetStats()
     # circuit = compile_circuit(n, qf_len, qf_ints, qf_base, sampler, keep_tidy=False, circuit_function=qf_pivot)
+    #QFloat.showStats()
     # test_qf_pivot_fhe(circuit, sampler, qf_len, qf_ints, qf_base, simulate=False)
 
     # test LU U decomposition in fhe:
     # -----------------------------
+    #QFloat.resetStats()
     # circuit = compile_circuit(n, qf_len, qf_ints, qf_base, sampler, keep_tidy=False, circuit_function=qf_lu_U)
+    #QFloat.showStats()
     # test_qf_LU_U_fhe(circuit, sampler, qf_len, qf_ints, qf_base, simulate=False)
 
     # test LU L decomposition in fhe:
     # -----------------------------
-    circuit = compile_circuit(n, qf_len, qf_ints, qf_base, sampler, keep_tidy=False, circuit_function=qf_lu_L)
-    QFloat.showStats()
-    
-    test_qf_LU_L_fhe(circuit, sampler, qf_len, qf_ints, qf_base, simulate=False)    
+    #QFloat.resetStats()
+    # circuit = compile_circuit(n, qf_len, qf_ints, qf_base, sampler, keep_tidy=False, circuit_function=qf_lu_L)
+    # QFloat.showStats()
+    # test_qf_LU_L_fhe(circuit, sampler, qf_len, qf_ints, qf_base, simulate=False)    
 
     # test inversion in fhe:
     # -----------------------------
+    # QFloat.resetStats()
     # circuit = compile_circuit(n, qf_len, qf_ints, qf_base, sampler, keep_tidy=False)
-    # (circuit, sampler, qf_len, qf_ints, qf_base, simulate=True) 
-    # (circuit, sampler, qf_len, qf_ints, qf_base, simulate=False) 
+    # QFloat.showStats()
+    # test_qf_inverse_fhe(circuit, sampler, qf_len, qf_ints, qf_base, simulate=False)
+

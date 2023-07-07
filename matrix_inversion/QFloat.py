@@ -166,6 +166,9 @@ def is_greater_or_equal_base_p(A, B):
         return is_greater_or_equal(A[-diff:], B) | (np.sum(A[0:-diff])>0)
 
 
+#=======================================================================================================================
+#                                                       Zero
+#=======================================================================================================================
 
 class Zero():
     """
@@ -202,9 +205,18 @@ class Zero():
     def __mul__(self, other):
         return self
 
+    def __rmul__(self, other):
+        return self        
+
     def __truediv__(self, other):
         return self
 
+    def __rtruediv__(self, other):
+        raise Exception('division by Zero')
+
+#=======================================================================================================================
+#                                                       SignedBinary
+#=======================================================================================================================
 
 class SignedBinary():
     """
@@ -327,11 +339,11 @@ class QFloat():
 
     def showStats():
         print('\nQFloat statistics :')
-        print('======================\n')
-        print('Additions      :' +  str(QFloat.ADDITIONS))
-        print('Subtractions   :' +  str(QFloat.SUBTRACTION))
-        print('Multiplications:' +  str(QFloat.MULTIPLICATION))
-        print('Divisions      :' +  str(QFloat.DIVISION))
+        print('======================')
+        print('Additions       : ' +  str(QFloat.ADDITIONS))
+        print('Subtractions    : ' +  str(QFloat.SUBTRACTION))
+        print('Multiplications : ' +  str(QFloat.MULTIPLICATION))
+        print('Divisions       : ' +  str(QFloat.DIVISION))
         print('\n')
 
     def _checkUnencrypted(self):
