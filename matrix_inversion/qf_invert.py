@@ -350,12 +350,15 @@ def qf_lu_decomposition(M):
                 U[i][j] = PM[i][j].copy()
 
         # l_{ij} = \frac{1}{u_{jj}} (a_{ij} - \sum_{k=1}^{j-1} u_{kj} l_{ik})
+        #inv_Ujj = SignedBinary(1) / U[j][j] # compute one division and then use multiplications
+        inv_Ujj = SignedBinary(1) / U[j][j]
         for i in range(j, n):
             if j>0:
                 s2 = qf_list_dot_product([U[k][j] for k in range(0,j)], [L[i][k] for k in range(0,j)])
-                L[i][j] = (PM[i][j] - s2) / U[j][j]
+                L[i][j] = (PM[i][j] - s2) * inv_Ujj
             else:
-                L[i][j] = PM[i][j] / U[j][j]
+                #L[i][j] = PM[i][j] / U[j][j]
+                L[i][j] = PM[i][j] * inv_Ujj
 
     # PM = LU
     P= transpose_2DList(P)
@@ -373,19 +376,40 @@ def qf_lu_inverse(P, L, U):
 
     # Forward substitution: Solve L * Y = P * A for Y
     Y = zeroListMatrix(n)
+    # precompute inverse of L to make less divisions
+    Ljj_inv = [SignedBinary(1) / L[j][j] for j in range(n)]
+
     for i in range(n):
         Y[i][0] = P[i][0] / L[0][0]
         for j in range(1, n):
-            Y[i][j] = (P[i][j] - qf_list_dot_product([ L[j][k] for k in range(j) ], [ Y[i][k] for k in range(j)])) / L[j][j]
+            Y[i][j] = (P[i][j] - qf_list_dot_product([ L[j][k] for k in range(j) ], [ Y[i][k] for k in range(j)])) * Ljj_inv[j]
+            #Y[i][j] = (P[i][j] - qf_list_dot_product([ L[j][k] for k in range(j) ], [ Y[i][k] for k in range(j)])) / L[j][j]
 
     # Backward substitution: Solve U * X = Y for X
     X = zeroListMatrix(n)
+    # precompute inverse of U to make less divisions
+    Ujj_inv = [SignedBinary(1) / U[j][j] for j in range(n)]
+
     for i in range(n - 1, -1, -1):
         X[i][-1] = Y[i][-1] / U[-1][-1]
         for j in range(n - 2, -1, -1):
-            X[i][j] = (Y[i][j] - qf_list_dot_product( [ U[j][k] for k in range(j+1,n)], [ X[i][k] for k in range(j+1,n) ])) / U[j][j]
+            X[i][j] = (Y[i][j] - qf_list_dot_product( [ U[j][k] for k in range(j+1,n)], [ X[i][k] for k in range(j+1,n) ])) * Ujj_inv[j]
+            #X[i][j] = (Y[i][j] - qf_list_dot_product( [ U[j][k] for k in range(j+1,n)], [ X[i][k] for k in range(j+1,n) ])) / U[j][j]
 
     return transpose_2DList(X)
+
+
+########################################################################################
+#                            2x2 and 3x3 SHORCUT FORMULAS
+########################################################################################
+
+# def qf_inverse_2x2(qf_M):
+#     """
+#     The inverse of a 2x2 matrix has a simple formla
+#     """
+#     [a, b] = qf_M[0]
+#     [c, d] = qf_M[1]
+#     det_M = a*d - b*c
 
 
 
@@ -468,6 +492,10 @@ def qf_matrix_inverse(qf_arrays, qf_signs, params):
     # reconstruct the matrix of QFloats with encrypted values:
     qf_M = qfloat_arrays_to_QFloat_matrix(qf_arrays, qf_signs, qf_ints, qf_base)
 
+    # if n=2:
+    #     qf_Minv = qf_inverse_2x2(qf_M)
+
+    # else:
     # compute the LU decomposition
     bin_P, qf_L, qf_U = qf_lu_decomposition(qf_M)
 
@@ -724,7 +752,7 @@ def test_qf_inverse_fhe(circuit, sampler, qf_len, qf_ints, qf_base, simulate=Fal
 
 if __name__ == '__main__':
 
-    n=2; qf_len = 20; qf_ints = 9; qf_base = 2
+    n=4; qf_len = 20; qf_ints = 9; qf_base = 2
 
     normal_sampler = ("Normal", lambda: np.random.randn(n, n) * 100)
     uniform_sampler = ("Uniform", lambda: np.random.uniform(0, 100, (n, n)))
