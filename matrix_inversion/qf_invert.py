@@ -689,12 +689,16 @@ def test_qf_inverse_fhe(circuit, sampler, qf_len, qf_ints, qf_base, simulate=Fal
 
 if __name__ == '__main__':
 
-    n=2; qf_len = 16; qf_ints = 9; qf_base = 2
+    n=2; qf_len = 20; qf_ints = 9; qf_base = 2
 
     normal_sampler = ("Normal", lambda: np.random.randn(n, n) * 100)
     uniform_sampler = ("Uniform", lambda: np.random.uniform(0, 100, (n, n)))
 
     sampler = uniform_sampler[1]
+
+    # test inverse qf python
+    # ----------------------
+    test_qf_inverse_python(sampler, n, qf_len, qf_ints, qf_base)
 
     # test pivot in fhe:
     # ------------------
@@ -703,5 +707,5 @@ if __name__ == '__main__':
 
     # test LU decomposition in fhe:
     # -----------------------------
-    circuit = compile_circuit(n, qf_len, qf_ints, qf_base, sampler, keep_tidy=False, circuit_function=qf_lu_U)
-    test_qf_LU_U_fhe(circuit, sampler, qf_len, qf_ints, qf_base, simulate=False)    
+    # circuit = compile_circuit(n, qf_len, qf_ints, qf_base, sampler, keep_tidy=False, circuit_function=qf_lu_U)
+    # test_qf_LU_U_fhe(circuit, sampler, qf_len, qf_ints, qf_base, simulate=False)    

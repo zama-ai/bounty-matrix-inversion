@@ -178,6 +178,38 @@ class SignedBinary():
         # init with a signed binary value (+1, -1 or 0)
         self.value = value
 
+    def toFloat(self):
+        return float(self.value)
+
+    def __add__(self, other):
+        if isinstance(other, SignedBinary):
+            # potentially no more a binary
+            return self.value + other.value
+        else:
+            return self.value + other
+
+    def __sub__(self, other):
+        if isinstance(other, SignedBinary):
+            # potentially no more a binary
+            return self.value - other.value
+        else:
+            return self.value - other
+
+    def __mul__(self, other):
+        if isinstance(other, SignedBinary):
+            # stays binary
+            return SignedBinary(self.value * other.value)
+        else:
+            return self.value * other    
+
+    def __truediv__(self, other):
+        if isinstance(other, SignedBinary):
+            # stays binary
+            return SignedBinary(self.value // other.value)
+        else:
+            return self.value / other
+      
+
 #=======================================================================================================================
 #                                                       QFfloats
 #=======================================================================================================================
@@ -680,6 +712,10 @@ class QFloat():
         """
         Multiply with another QFLoat or number, see __imul__
         """
+        # special case when multiplying by unencrypted 0, the result is an unencrypted 0
+        if (isinstance(other, numbers.Integral) and other==0) or (isinstance(other, SignedBinary) and other.value==0):
+            return SignedBinary(0)
+
         if not self._encrypted and not (isinstance(other, numbers.Integral) or (isinstance(other, SignedBinary) and isinstance(other.value, numbers.Integral))):
             if(isinstance(other, Tracer) or isinstance(other, SignedBinary) ):
                 raise ValueError('Cannot multiply unencrypted with encrypted number')
@@ -772,8 +808,12 @@ class QFloat():
         """
         Return other divided by self
         """
-        # first, create a QFloat if other is a number:
-        if isinstance(other, Tracer) or isinstance(other, numbers.Integral):
+        # special case when other is unencrypted 0, the result is an unencrypted 0
+        if (isinstance(other, numbers.Integral) and other==0) or (isinstance(other, SignedBinary) and other.value==0):
+            return SignedBinary(0)
+        
+        elif isinstance(other, Tracer) or isinstance(other, numbers.Integral):
+            # create a QFloat if other is a number:
             qf = QFloat.one(len(self), self._ints, self._base, encrypted=isinstance(other, Tracer))
             qf._array[self._ints-1]*=other
             qf._sign *= np.sign(other)

@@ -172,9 +172,7 @@ class TestQFloat(unittest.TestCase):
             assert( (2/qf1).toFloat() - 2/f1 < 0.1)
             assert( (qf1/2).toFloat() - f1/2.0 < 0.1)
 
-            print( qf1.toFloat(), (SignedBinary(1)/qf1).toFloat(), (1.0/f1) )
             assert( (SignedBinary(1)/qf1).toFloat() - 1.0/f1 < 0.1)
-            print( qf1.toFloat(), (SignedBinary(-1)/qf1).toFloat(), (-1.0/f1) )
             assert( (SignedBinary(-1)/qf1).toFloat() - (-1.0/f1) < 0.1)
             assert( (qf1/SignedBinary(0)).toFloat() > 1000) #overflow
 
