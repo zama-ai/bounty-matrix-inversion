@@ -1,7 +1,7 @@
 import numpy as np
 import scipy as sc
 import time
-from QFloat import QFloat, SignedBinary
+from QFloat import QFloat, SignedBinary, Zero
 from concrete import fhe
 
 Tracer = fhe.tracing.tracer.Tracer
@@ -153,6 +153,12 @@ def binaryListMatrix(M):
     """
     return map_2D_list( [[M[i,j] for j in range(M.shape[1])] for i in range(M.shape[0]) ], lambda x: SignedBinary(x) )    
 
+def zeroListMatrix(n):
+    """
+    Creates a square list matrix of Zeros
+    """
+    return [[Zero() for j in range(n)] for i in range(n) ]
+
 def qf_list_dot_product(list1, list2):
     """
     Dot product of two QFloat lists
@@ -240,6 +246,8 @@ def qfloat_matrix_to_arrays(M, qf_len, qf_ints, qf_base):
                 qf_arrays[index,:] = M[i][j].toArray()
             elif isinstance(M[i][j], SignedBinary):
                 qf_arrays[index,qf_ints-1] = M[i][j].value
+            elif isinstance(M[i][j], Zero):
+                qf_arrays[index,qf_ints-1] = 0
             else:
                 qf_arrays[index,qf_ints-1] = M[i][j]
             index += 1
@@ -322,8 +330,8 @@ def qf_lu_decomposition(M):
 
     # Initialize 2D-list matrices for L and U
     # (QFloats can be multiplied with integers, this saves computations)
-    L = binaryListMatrix(np.zeros((n,n), dtype='int'))
-    U = binaryListMatrix(np.zeros((n,n), dtype='int'))
+    L = zeroListMatrix(n)
+    U = zeroListMatrix(n)
 
     # Create the pivot matrix P and the multiplied matrix PM
     P = binaryListMatrix(qf_pivot_matrix(M))
@@ -364,14 +372,14 @@ def qf_lu_inverse(P, L, U):
     n = len(L)
 
     # Forward substitution: Solve L * Y = P * A for Y
-    Y = np.zeros((n,n), dtype='int').tolist()
+    Y = L = zeroListMatrix(n)
     for i in range(n):
         Y[i][0] = P[i][0] / L[0][0]
         for j in range(1, n):
             Y[i][j] = (P[i][j] - qf_list_dot_product([ L[j][k] for k in range(j) ], [ Y[i][k] for k in range(j)])) / L[j][j]
 
     # Backward substitution: Solve U * X = Y for X
-    X = np.zeros((n,n), dtype='int').tolist()
+    X = L = zeroListMatrix(n)
     for i in range(n - 1, -1, -1):
         X[i][-1] = Y[i][-1] / U[-1][-1]
         for j in range(n - 2, -1, -1):
@@ -650,6 +658,9 @@ def test_qf_pivot_fhe(circuit, sampler, qf_len, qf_ints, qf_base, simulate=False
     M = sampler()
     qf_Res = run_qf_circuit_fhe(circuit, M, qf_len, qf_ints, qf_base, simulate, True)
     
+    if(simulate):
+        print('SIMULATING')
+
     print('QFloat pivot :')
     print(qf_Res)
     print(' ')
@@ -662,6 +673,9 @@ def test_qf_LU_U_fhe(circuit, sampler, qf_len, qf_ints, qf_base, simulate=False)
     M = sampler()
     qf_Res = run_qf_circuit_fhe(circuit, M, qf_len, qf_ints, qf_base, simulate)
     
+    if(simulate):
+        print('SIMULATING')
+
     print('QFloat LU U :')
     print(qf_Res)
     print(' ')
@@ -671,9 +685,30 @@ def test_qf_LU_U_fhe(circuit, sampler, qf_len, qf_ints, qf_base, simulate=False)
     print(U)
     print(' ') 
 
+
+def test_qf_LU_L_fhe(circuit, sampler, qf_len, qf_ints, qf_base, simulate=False):
+    M = sampler()
+    qf_Res = run_qf_circuit_fhe(circuit, M, qf_len, qf_ints, qf_base, simulate)
+    
+    if(simulate):
+        print('SIMULATING')
+
+    print('QFloat LU L :')
+    print(qf_Res)
+    print(' ')
+
+    print('LU L :')
+    P,L,U = lu_decomposition(M)
+    print(L)
+    print(' ') 
+
+
 def test_qf_inverse_fhe(circuit, sampler, qf_len, qf_ints, qf_base, simulate=False):
     M = sampler()
     qf_Res = run_qf_circuit_fhe(circuit, M, qf_len, qf_ints, qf_base, simulate)
+
+    if(simulate):
+        print('SIMULATING')
 
     print('QFloat inverse :')
     print(qf_Res)
@@ -689,7 +724,7 @@ def test_qf_inverse_fhe(circuit, sampler, qf_len, qf_ints, qf_base, simulate=Fal
 
 if __name__ == '__main__':
 
-    n=2; qf_len = 20; qf_ints = 9; qf_base = 2
+    n=2; qf_len = 16; qf_ints = 9; qf_base = 2
 
     normal_sampler = ("Normal", lambda: np.random.randn(n, n) * 100)
     uniform_sampler = ("Uniform", lambda: np.random.uniform(0, 100, (n, n)))
@@ -698,14 +733,27 @@ if __name__ == '__main__':
 
     # test inverse qf python
     # ----------------------
-    test_qf_inverse_python(sampler, n, qf_len, qf_ints, qf_base)
+    #test_qf_inverse_python(sampler, n, qf_len, qf_ints, qf_base)
 
     # test pivot in fhe:
     # ------------------
     # circuit = compile_circuit(n, qf_len, qf_ints, qf_base, sampler, keep_tidy=False, circuit_function=qf_pivot)
     # test_qf_pivot_fhe(circuit, sampler, qf_len, qf_ints, qf_base, simulate=False)
 
-    # test LU decomposition in fhe:
+    # test LU U decomposition in fhe:
     # -----------------------------
     # circuit = compile_circuit(n, qf_len, qf_ints, qf_base, sampler, keep_tidy=False, circuit_function=qf_lu_U)
-    # test_qf_LU_U_fhe(circuit, sampler, qf_len, qf_ints, qf_base, simulate=False)    
+    # test_qf_LU_U_fhe(circuit, sampler, qf_len, qf_ints, qf_base, simulate=False)
+
+    # test LU L decomposition in fhe:
+    # -----------------------------
+    circuit = compile_circuit(n, qf_len, qf_ints, qf_base, sampler, keep_tidy=False, circuit_function=qf_lu_L)
+    QFloat.showStats()
+    
+    test_qf_LU_L_fhe(circuit, sampler, qf_len, qf_ints, qf_base, simulate=False)    
+
+    # test inversion in fhe:
+    # -----------------------------
+    # circuit = compile_circuit(n, qf_len, qf_ints, qf_base, sampler, keep_tidy=False)
+    # (circuit, sampler, qf_len, qf_ints, qf_base, simulate=True) 
+    # (circuit, sampler, qf_len, qf_ints, qf_base, simulate=False) 

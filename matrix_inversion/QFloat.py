@@ -167,6 +167,44 @@ def is_greater_or_equal_base_p(A, B):
 
 
 
+class Zero():
+    """
+    A simple class to differentiate values that we know are zero from others
+    It is usefull to save computations for operations with QFloats
+    """
+    def __init__(self):
+        pass
+
+    def toFloat(self):
+        return float(0)
+
+    def __add__(self, other):
+        if isinstance(other, Zero):
+            return self
+        else:
+            return other
+
+    def __radd__(self, other):
+        if isinstance(other, Zero):
+            return self
+        else:
+            return other            
+
+    def __sub__(self, other):
+        if isinstance(other, Zero):
+            return self        
+        else:
+            return -other
+
+    def __rsub__(self, other):
+        return other
+
+    def __mul__(self, other):
+        return self
+
+    def __truediv__(self, other):
+        return self
+
 
 class SignedBinary():
     """
@@ -185,6 +223,8 @@ class SignedBinary():
         if isinstance(other, SignedBinary):
             # potentially no more a binary
             return self.value + other.value
+        elif isinstance(other, QFloat):
+            return other.__add__(self)
         else:
             return self.value + other
 
@@ -192,6 +232,8 @@ class SignedBinary():
         if isinstance(other, SignedBinary):
             # potentially no more a binary
             return self.value - other.value
+        elif isinstance(other, QFloat):
+            return other.__rsub__(self)            
         else:
             return self.value - other
 
@@ -199,6 +241,8 @@ class SignedBinary():
         if isinstance(other, SignedBinary):
             # stays binary
             return SignedBinary(self.value * other.value)
+        elif isinstance(other, QFloat):
+            return other.__mul__(self)            
         else:
             return self.value * other    
 
@@ -206,8 +250,16 @@ class SignedBinary():
         if isinstance(other, SignedBinary):
             # stays binary
             return SignedBinary(self.value // other.value)
+        elif isinstance(other, QFloat):
+            return other.__rtruediv__(self)
         else:
             return self.value / other
+
+    def __neg__(self):
+        return SignedBinary(-1*self.value)
+
+    def __abs__(self):
+        return SignedBinary(np.abs(self.value))
       
 
 #=======================================================================================================================
@@ -225,6 +277,12 @@ class QFloat():
     # Use it with caution because it can increase bitwidth too much in FHE:
     # to prevent this, you may need to manually tidy some QFloats in your algorithm to prevent
     KEEP_TIDY=True
+
+    # Statistics for counting operations between QFloats within a circuit
+    ADDITIONS=0
+    SUBTRACTION=0
+    MULTIPLICATION=0
+    DIVISION=0
 
     def __init__(self, array, ints=None, base=2, isTidy=True, sign=None):
         """
@@ -260,6 +318,21 @@ class QFloat():
 
         if not isTidy and QFloat.KEEP_TIDY:
             self.tidy()
+
+    def resetStats():
+        QFloat.ADDITIONS=0
+        QFloat.SUBTRACTION=0
+        QFloat.MULTIPLICATION=0
+        QFloat.DIVISION=0
+
+    def showStats():
+        print('\nQFloat statistics :')
+        print('======================\n')
+        print('Additions      :' +  str(QFloat.ADDITIONS))
+        print('Subtractions   :' +  str(QFloat.SUBTRACTION))
+        print('Multiplications:' +  str(QFloat.MULTIPLICATION))
+        print('Divisions      :' +  str(QFloat.DIVISION))
+        print('\n')
 
     def _checkUnencrypted(self):
         if self._encrypted:
@@ -580,6 +653,7 @@ class QFloat():
             addition = QFloat( self._array, self._ints, self._base, False)
             addition._array[self._ints-1]+=other.value
         else:
+            QFloat.ADDITIONS+=1 # count only addition with other Qfloat
             self.checkCompatibility(other)
             addition = QFloat(self._array + other._array, self._ints, self._base, False)
 
@@ -612,6 +686,7 @@ class QFloat():
             self.checkFHECompatibility(isinstance(other.value, Tracer))
             self._array[self._ints-1]+=other.value        
         else:
+            QFloat.ADDITIONS+=1 # count only addition with other Qfloat
             self.checkFHECompatibility(other._encrypted)
 
             self.checkCompatibility(other)
@@ -639,6 +714,7 @@ class QFloat():
             subtraction = QFloat( self._array, self._ints, self._base, False)
             subtraction._array[self._ints-1]-=other.value
         else:
+            QFloat.SUBTRACTION+=1 # count only subtractions with other Qfloat
             self.checkCompatibility(other)
             subtraction = QFloat(self._array - other._array, self._ints, self._base, False)
         
@@ -677,6 +753,7 @@ class QFloat():
             if self._sign is not None:
                 self._sign = self._sign*np.sign(other.value)            
         else:
+            QFloat.MULTIPLICATION+=1 # count only multiplications with other Qfloat
             # multiply with another compatible QFloat 
             self.checkFHECompatibility(other._encrypted)
             self.checkCompatibility(other)
@@ -713,8 +790,8 @@ class QFloat():
         Multiply with another QFLoat or number, see __imul__
         """
         # special case when multiplying by unencrypted 0, the result is an unencrypted 0
-        if (isinstance(other, numbers.Integral) and other==0) or (isinstance(other, SignedBinary) and other.value==0):
-            return SignedBinary(0)
+        if isinstance(other, Zero):
+            return Zero()
 
         if not self._encrypted and not (isinstance(other, numbers.Integral) or (isinstance(other, SignedBinary) and isinstance(other.value, numbers.Integral))):
             if(isinstance(other, Tracer) or isinstance(other, SignedBinary) ):
@@ -751,6 +828,8 @@ class QFloat():
         WARNING: dividing by zero will give zero
         WARNING: precision of division does not increase
         """
+        if isinstance(other, Zero):
+            raise Exception('division by Zero')
 
         if isinstance(other, SignedBinary):
             self.checkFHECompatibility(isinstance(other.value, Tracer))
@@ -771,6 +850,7 @@ class QFloat():
         else:
             other.tidy()
 
+        QFloat.DIVISION+=1 # count only divisions with other Qfloat
         self.checkCompatibility(other)
         self.tidy()
 
@@ -808,9 +888,9 @@ class QFloat():
         """
         Return other divided by self
         """
-        # special case when other is unencrypted 0, the result is an unencrypted 0
-        if (isinstance(other, numbers.Integral) and other==0) or (isinstance(other, SignedBinary) and other.value==0):
-            return SignedBinary(0)
+        if isinstance(other, Zero):
+            # special case when other is unencrypted 0, the result is an unencrypted 0
+            return Zero()
         
         elif isinstance(other, Tracer) or isinstance(other, numbers.Integral):
             # create a QFloat if other is a number:
@@ -824,6 +904,8 @@ class QFloat():
             return other / self
 
         elif isinstance(other, SignedBinary):
+            QFloat.DIVISION+=1 # this division is counted because it is heavy
+
             # When other is a binary value, we can make a smaller division and save computations
             self.tidy()
 
