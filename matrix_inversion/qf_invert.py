@@ -403,17 +403,29 @@ def qf_lu_inverse(P, L, U):
 #                            2x2 and 3x3 SHORCUT FORMULAS
 ########################################################################################
 
-def qf_inverse_2x2(qf_M):
+def qf_inverse_2x2(qf_M, qf_len_out, qf_ints_out):
     """
     The inverse of a 2x2 matrix has a simple formla
     """
     [a, b] = qf_M[0]
     [c, d] = qf_M[1]
-    det_M = a*d - b*c
-    det_M_inv = SignedBinary(1) / det_M
-    det_M_inv_neg = -det_M
 
-    M_inv = [[det_M_inv*d, det_M_inv_neg*b], [det_M_inv_neg*c, det_M_inv*a]]
+    ad = QFloat.fromMul(a,d, 20, 18)
+    bc = QFloat.fromMul(b,c, 20, 18)
+    det_M = ad - bc
+
+    det_M_inv = det_M.invert(1, 25, 1)
+    det_M_inv_neg = -det_M_inv    
+    # det_M_inv = SignedBinary(1) / det_M
+    # det_M_inv_neg = -det_M
+
+    print(d.toFloat())
+    print(det_M_inv.toFloat())
+    print(QFloat.fromMul(d, det_M_inv, qf_len_out, qf_ints_out).toFloat())
+
+    M_inv = [[QFloat.fromMul(d, det_M_inv, qf_len_out, qf_ints_out), QFloat.fromMul(b, det_M_inv_neg, qf_len_out, qf_ints_out)],
+             [QFloat.fromMul(c, det_M_inv_neg, qf_len_out, qf_ints_out), QFloat.fromMul(a, det_M_inv, qf_len_out, qf_ints_out)]]
+    #M_inv = [[d/det_M, -b/det_M], [-c/det_M, a/det_M]]
     return M_inv
 
 
@@ -488,7 +500,7 @@ def qf_matrix_inverse(qf_arrays, qf_signs, params):
     """
     Compute the whole inverse
     """
-    n, qf_len, qf_ints, qf_base = params
+    [n, qf_len, qf_ints, qf_base, qf_len_out, qf_ints_out] = params
 
     assert( n*n == qf_arrays.shape[0])
     assert( qf_len == qf_arrays.shape[1])
@@ -498,7 +510,7 @@ def qf_matrix_inverse(qf_arrays, qf_signs, params):
 
     if n==2:
         # use shortcut formula
-        qf_Minv = qf_inverse_2x2(qf_M)
+        qf_Minv = qf_inverse_2x2(qf_M, qf_len_out, qf_ints_out)
 
     else:
         # compute the LU decomposition
@@ -507,10 +519,8 @@ def qf_matrix_inverse(qf_arrays, qf_signs, params):
         # compute inverse from P L U
         qf_Minv = qf_lu_inverse(bin_P, qf_L, qf_U)
 
-    qf_Minv = qf_inverse_2x2(qf_M)        
-
     # break the resulting QFloats into arrays:
-    qf_inv_arrays = qfloat_matrix_to_arrays(qf_Minv, qf_len, qf_ints, qf_base)
+    qf_inv_arrays = qfloat_matrix_to_arrays(qf_Minv, qf_len_out, qf_ints_out, qf_base)
 
     return qf_inv_arrays
 
@@ -601,23 +611,22 @@ def test_qf_PLU_python(sampler, n, qf_len, qf_ints, qf_base):
     print(' ') 
 
 
-def test_qf_inverse_python(sampler, n, qf_len, qf_ints, qf_base):
+def test_qf_inverse_python(sampler, params):
     """
     Test the matrix inverse using QFloats, in python
     """
     # gen random matrix
     M = sampler()
 
+    [n, qf_len, qf_ints, qf_base, qf_len_out, qf_ints_out] = params
+
     # convert it to QFloat arrays
     qf_arrays, qf_signs = float_matrix_to_qfloat_arrays(M, qf_len, qf_ints, qf_base)
-
-    # set params
-    params = [n, qf_len, qf_ints, qf_base]
 
     QFloat.KEEP_TIDY=True
     output = qf_matrix_inverse(qf_arrays, qf_signs, params)
 
-    qf_Res = qfloat_arrays_to_float_matrix(output, qf_ints, qf_base)
+    qf_Res = qfloat_arrays_to_float_matrix(output, qf_ints_out, qf_base)
 
     print('\n==== Test python ====')
     print('\nQFloat inverse :')
@@ -641,8 +650,8 @@ def test_qf_inverse_python(sampler, n, qf_len, qf_ints, qf_base):
 
 def compile_circuit(n, qf_len, qf_ints, qf_base, sampler, keep_tidy=True, circuit_function=qf_matrix_inverse):
 
-    # set params
-    params = [n, qf_len, qf_ints, qf_base]
+    # set circuit params
+    circuit_params = [n, qf_len, qf_ints, qf_base]
 
     QFloat.KEEP_TIDY=keep_tidy
 
@@ -652,7 +661,7 @@ def compile_circuit(n, qf_len, qf_ints, qf_base, sampler, keep_tidy=True, circui
         qf_arrays, qf_signs = float_matrix_to_qfloat_arrays(M, qf_len, qf_ints, qf_base)
         inputset.append((qf_arrays, qf_signs))
 
-    compiler = fhe.Compiler(lambda x,y: circuit_function(x,y,params), {"x": "encrypted", "y": "encrypted"})
+    compiler = fhe.Compiler(lambda x,y: circuit_function(x,y,circuit_params), {"x": "encrypted", "y": "encrypted"})
     make_circuit = lambda : compiler.compile(
         inputset=inputset,
         configuration=fhe.Configuration(
@@ -738,8 +747,10 @@ def test_qf_LU_L_fhe(circuit, sampler, qf_len, qf_ints, qf_base, simulate=False)
     print(' ') 
 
 
-def test_qf_inverse_fhe(circuit, sampler, qf_len, qf_ints, qf_base, simulate=False):
+def test_qf_inverse_fhe(circuit, sampler, params, simulate=False):
     M = sampler()
+
+    [n, qf_len, qf_ints, qf_base, qf_len_out, qf_ints_out] = params
     qf_Res = run_qf_circuit_fhe(circuit, M, qf_len, qf_ints, qf_base, simulate)
 
     if(simulate):
@@ -759,17 +770,19 @@ def test_qf_inverse_fhe(circuit, sampler, qf_len, qf_ints, qf_base, simulate=Fal
 
 if __name__ == '__main__':
 
-    n=2; qf_len = 30; qf_ints = 17; qf_base = 2
+    n=2; qf_len = 12; qf_ints = 9; qf_base = 2; qf_len_out=16; qf_ints_out = 2;
 
     normal_sampler = ("Normal", lambda: np.random.randn(n, n) * 100)
     uniform_sampler = ("Uniform", lambda: np.random.uniform(0, 100, (n, n)))
 
     sampler = uniform_sampler[1]
 
+    params = [n, qf_len, qf_ints, qf_base, qf_len_out, qf_ints_out]
+
     # test inverse qf python
     # ----------------------
     QFloat.resetStats()
-    test_qf_inverse_python(sampler, n, qf_len, qf_ints, qf_base)
+    test_qf_inverse_python(sampler, params)
     QFloat.showStats()
 
     # test pivot in fhe:
@@ -798,5 +811,5 @@ if __name__ == '__main__':
     QFloat.resetStats()
     circuit = compile_circuit(n, qf_len, qf_ints, qf_base, sampler, keep_tidy=False)
     QFloat.showStats()
-    test_qf_inverse_fhe(circuit, sampler, qf_len, qf_ints, qf_base, simulate=False)
+    test_qf_inverse_fhe(circuit, sampler, params, simulate=False)
 

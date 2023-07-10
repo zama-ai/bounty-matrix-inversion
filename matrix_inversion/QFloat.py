@@ -919,19 +919,6 @@ class QFloat():
             if not a._base == b._base:
                 raise ValueError('bases are different')
 
-            # crop b to save computations if necessary:
-            diffints = newints - b._ints
-            diffdec = (newlength - newints) - (len(b) - b._ints)
-            if diffints < 0 or diffdec < 0:
-                b=b.copy()
-
-                if diffints < 0:
-                    b._array = b._array[-diffints:]
-                    b._ints = newints
-
-                if diffdec < 0:
-                    b._array = b._array[:-diffdec]
-
             # A QFloat array is made of 2 parts, integer part and float part
             # The multiplication array will be the sum of a.integer * b + a.float * b
             mularray = fhe.zeros((len(a), newlength))
@@ -940,8 +927,10 @@ class QFloat():
                 # index from b where the array mul should be inserted in mularray
                 indb = newints-a._ints+i+1-b._ints if i<a._ints else newints-a._ints+i+1-b._ints
                 # compute only needed multiplication of b._array*a._array[i], accounting for crops
-                mul = b._array[0:max(len(b),newlength-indb)]*a._array[i]
-                insert_array_at_index(mul, mularray[i], indb)
+                ind1 = 0 if indb >=0 else -indb
+                ind2 = max(len(b),newlength-indb)
+                mul = b._array[ind1:ind2]*a._array[i]
+                insert_array_at_index(mul, mularray[i], indb+ind1)
 
             # the multiplication array is made from the sum of the muarray rows
             multiplication = QFloat(np.sum(mularray, axis=0), newints, a._base, False)
