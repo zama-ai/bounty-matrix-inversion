@@ -937,9 +937,10 @@ class QFloat():
             mularray = fhe.zeros((len(a), newlength))
             # integer part, shift  to the left
             for i in range(0,len(a)):
-                mul = b._array*a._array[i]
                 # index from b where the array mul should be inserted in mularray
                 indb = newints-a._ints+i+1-b._ints if i<a._ints else newints-a._ints+i+1-b._ints
+                # compute only needed multiplication of b._array*a._array[i], accounting for crops
+                mul = b._array[0:max(len(b),newlength-indb)]*a._array[i]
                 insert_array_at_index(mul, mularray[i], indb)
 
             # the multiplication array is made from the sum of the muarray rows
