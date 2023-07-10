@@ -148,9 +148,14 @@ class TestQFloat(unittest.TestCase):
             assert( (SignedBinary(1)*qf1).toFloat() - f1 < 0.1)
             qf2 = QFloat.fromFloat(f2, size, ints, base)
             prod = qf1*qf2
+
             prod2 = integer*qf2
             assert( prod.toFloat()-(f1*f2) < 0.1 ) # mul
             assert( prod2.toFloat()-(integer*f2) < 0.1 ) # mul
+
+            # from mul
+            assert( QFloat.fromMul(qf1, qf2).toFloat()-(f1*f2) < 0.1 )
+
             qf1 *= qf2
             assert( qf1.toFloat()-(f1*f2) < 0.1 ) # imul
 
@@ -218,7 +223,7 @@ class TestQFloat(unittest.TestCase):
 # TODO
 
 
-unittest.main()
+#unittest.main()
 
-# suite = unittest.TestLoader().loadTestsFromName('test_QFloat.TestQFloat.test_div_np')
-# unittest.TextTestRunner(verbosity=1).run(suite)
+suite = unittest.TestLoader().loadTestsFromName('test_QFloat.TestQFloat.test_mul_np')
+unittest.TextTestRunner(verbosity=1).run(suite)
