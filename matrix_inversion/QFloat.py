@@ -173,7 +173,7 @@ def insert_array_at_index(a, b, i):
         a = a[-i:]
         i = 0
     # Compute the number of elements we can insert from a into b
-    n = min(len(b) - i, len(a))
+    n = min(b.size - i, a.size)
     # Insert elements from a into b
     b[i:i+n] = a[:n]
 

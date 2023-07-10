@@ -412,20 +412,14 @@ def qf_inverse_2x2(qf_M, qf_len_out, qf_ints_out):
 
     ad = QFloat.fromMul(a,d, 20, 18)
     bc = QFloat.fromMul(b,c, 20, 18)
-    det_M = ad - bc
+    det = ad - bc # determinant of M
 
-    det_M_inv = det_M.invert(1, 25, 1)
-    det_M_inv_neg = -det_M_inv    
-    # det_M_inv = SignedBinary(1) / det_M
-    # det_M_inv_neg = -det_M
+    det_inv = det.invert(1, 25, 1)
+    det_inv_n = -det_inv   
 
-    print(d.toFloat())
-    print(det_M_inv.toFloat())
-    print(QFloat.fromMul(d, det_M_inv, qf_len_out, qf_ints_out).toFloat())
+    mul = lambda x,y: QFloat.fromMul(x, y, qf_len_out, qf_ints_out)
+    M_inv = [[mul(d, det_inv), mul(b, det_inv_n)], [mul(c, det_inv_n), mul(a, det_inv)]]
 
-    M_inv = [[QFloat.fromMul(d, det_M_inv, qf_len_out, qf_ints_out), QFloat.fromMul(b, det_M_inv_neg, qf_len_out, qf_ints_out)],
-             [QFloat.fromMul(c, det_M_inv_neg, qf_len_out, qf_ints_out), QFloat.fromMul(a, det_M_inv, qf_len_out, qf_ints_out)]]
-    #M_inv = [[d/det_M, -b/det_M], [-c/det_M, a/det_M]]
     return M_inv
 
 
@@ -648,10 +642,7 @@ def test_qf_inverse_python(sampler, params):
 #                                           FHE
 ########################################################################################
 
-def compile_circuit(n, qf_len, qf_ints, qf_base, sampler, keep_tidy=True, circuit_function=qf_matrix_inverse):
-
-    # set circuit params
-    circuit_params = [n, qf_len, qf_ints, qf_base]
+def compile_circuit(params, sampler, keep_tidy=True, circuit_function=qf_matrix_inverse):
 
     QFloat.KEEP_TIDY=keep_tidy
 
@@ -661,7 +652,7 @@ def compile_circuit(n, qf_len, qf_ints, qf_base, sampler, keep_tidy=True, circui
         qf_arrays, qf_signs = float_matrix_to_qfloat_arrays(M, qf_len, qf_ints, qf_base)
         inputset.append((qf_arrays, qf_signs))
 
-    compiler = fhe.Compiler(lambda x,y: circuit_function(x,y,circuit_params), {"x": "encrypted", "y": "encrypted"})
+    compiler = fhe.Compiler(lambda x,y: circuit_function(x,y,params), {"x": "encrypted", "y": "encrypted"})
     make_circuit = lambda : compiler.compile(
         inputset=inputset,
         configuration=fhe.Configuration(
@@ -679,7 +670,7 @@ def compile_circuit(n, qf_len, qf_ints, qf_base, sampler, keep_tidy=True, circui
     return circuit
 
 
-def run_qf_circuit_fhe(circuit, M, qf_len, qf_ints, qf_base, simulate=False, raw_output=False):
+def run_qf_circuit_fhe(circuit, M, qf_len, qf_ints, qf_base, qf_ints_out, simulate=False, raw_output=False):
     # convert it to QFloat arrays
     qf_arrays, qf_signs = float_matrix_to_qfloat_arrays(M, qf_len, qf_ints, qf_base)
 
@@ -692,7 +683,7 @@ def run_qf_circuit_fhe(circuit, M, qf_len, qf_ints, qf_base, simulate=False, raw
         decrypted = measure_time(circuit.simulate,'Simulating', qf_arrays, qf_signs)
 
     if not raw_output:
-        qf_Res = qfloat_arrays_to_float_matrix(decrypted, qf_ints, qf_base)
+        qf_Res = qfloat_arrays_to_float_matrix(decrypted, qf_ints_out, qf_base)
     else:
         qf_Res = decrypted
 
@@ -751,7 +742,7 @@ def test_qf_inverse_fhe(circuit, sampler, params, simulate=False):
     M = sampler()
 
     [n, qf_len, qf_ints, qf_base, qf_len_out, qf_ints_out] = params
-    qf_Res = run_qf_circuit_fhe(circuit, M, qf_len, qf_ints, qf_base, simulate)
+    qf_Res = run_qf_circuit_fhe(circuit, M, qf_len, qf_ints, qf_base, qf_ints_out, simulate)
 
     if(simulate):
         print('SIMULATING')
@@ -809,7 +800,7 @@ if __name__ == '__main__':
     # test inversion in fhe:
     # -----------------------------
     QFloat.resetStats()
-    circuit = compile_circuit(n, qf_len, qf_ints, qf_base, sampler, keep_tidy=False)
+    circuit = compile_circuit(params, sampler, keep_tidy=True)
     QFloat.showStats()
-    test_qf_inverse_fhe(circuit, sampler, params, simulate=False)
+    test_qf_inverse_fhe(circuit, sampler, params, simulate=True)
 
