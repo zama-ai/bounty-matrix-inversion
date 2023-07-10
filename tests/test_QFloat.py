@@ -176,6 +176,11 @@ class TestQFloat(unittest.TestCase):
             assert( (SignedBinary(-1)/qf1).toFloat() - (-1.0/f1) < 0.1)
             assert( (qf1/SignedBinary(0)).toFloat() > 1000) #overflow
 
+            newlen = np.random.randint(30,40)
+            newints = np.random.randint(10,13)
+            assert( qf1.invert(1, newlen, newints).toFloat() - 1.0/f1 < 0.1)
+            assert( (SignedBinary(-1)/qf1).toFloat() - (-1.0/f1) < 0.1)            
+
             qf2 = QFloat.fromFloat(f2, size, ints, base)
             div = qf1/qf2
             if not( div.toFloat()-(f1/f2) < 0.1 ):

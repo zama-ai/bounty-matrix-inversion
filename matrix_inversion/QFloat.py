@@ -877,7 +877,7 @@ class QFloat():
         fp = len(self)-self._ints
 
         # We consider each array as representing integers a and b here
-        # Let's left shit the first array which corresponds by multiplying a by fp:
+        # Let's left shit the first array which corresponds by multiplying a by 2^fp:
         shift_arr = np.concatenate((a, fhe.zeros(fp)), axis=0)
         # Make the integer division (a*fp)/b with our long division algorithm:
         div_array = base_p_division(shift_arr, b, self._base)
@@ -916,40 +916,52 @@ class QFloat():
             return other / self
 
         elif isinstance(other, SignedBinary):
-            QFloat.DIVISION+=1 # this division is counted because it is heavy
-
-            # When other is a binary value, we can make a smaller division and save computations
-            self.tidy()
-
-            # get signs and make arrays positive
-
-            signa = other.value # the value is also its sign
-            a = (signa!=0)*fhe.ones(1) # an array with one value to save computations
-
-            signb = self.getSign()
-            b = signb*(self._array)
-
-            # The float precision is the number of digits after the dot:
-            fp = len(self)-self._ints
-
-            # We consider each array as representing integers a and b here
-            # Let's left shit the first array which corresponds by multiplying a by 2*fp (normal shift + decimals):
-            shift_arr = np.concatenate((a, fhe.zeros(2*fp)), axis=0)
-            # Make the integer division (a*fp)/b with our long division algorithm:
-            div_array = base_p_division(shift_arr, b, self._base)
-
-            # Correct size of div_array
-            diff=len(self)-div_array.size
-            if diff>0:
-                div_array = np.concatenate( (fhe.zeros(diff), div_array), axis=0)
-            else:
-                div_array = div_array[-diff:]
-            # The result array encodes for a QFloat with fp precision, which is equivalent to divide the result by fp
-            # giving as expected the number (a * fp) / b / fp :
-            sign=signa*signb
-            division = QFloat(sign*div_array, self._ints, self._base, True, sign)
-
-            return division            
+            # get sign, then invert ith this sign (can be 0)
+            return self.invert(other.value, len(self), self._ints) # the value is also its sign
             
         else:
             raise ValueError('Unknown class for other')
+
+    def invert(self, sign=1, newlength=None, newints=None):
+        """
+        Compute the signed invert of the QFloat, with different length and ints values if requested
+        """
+        QFloat.DIVISION+=1 # this division is counted because it is heavy
+
+        # tidy before dividing
+        self.tidy()
+
+        if not newlength:
+            newlength = len(self)
+        if not newints:
+            newints = self._ints
+
+        # get signs of dividend and divisor
+        signa = sign
+        a = fhe.ones(1) # an array with one value to save computations
+
+        signb = self.getSign()
+        b = signb*(self._array) # make array positive for division
+
+        # The float precision is the number of digits after the dot:
+        fp = newlength-newints # new float precision
+        fpself = len(self)-self._ints # self float precision
+
+        # We consider each array as representing integers a and b here
+        # Let's left shit the first array which corresponds by multiplying a by 2^(fpself + fp) (decimals of old+new precision):
+        shift_arr = np.concatenate((a, fhe.zeros(fpself+fp)), axis=0)
+        # Make the integer division (a*fp)/b with our long division algorithm:
+        div_array = base_p_division(shift_arr, b, self._base)
+
+        # Correct size of div_array
+        diff=newlength-div_array.size
+        if diff>0:
+            div_array = np.concatenate( (fhe.zeros(diff), div_array), axis=0)
+        else:
+            div_array = div_array[-diff:]
+        # The result array encodes for a QFloat with fp precision, which is equivalent to divide the result by fp
+        # giving as expected the number (a * fp) / b / fp :
+        newsign=signa*signb
+        invert_div = QFloat(newsign*div_array, newints, self._base, True, newsign)
+
+        return invert_div            

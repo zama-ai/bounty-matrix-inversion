@@ -411,8 +411,9 @@ def qf_inverse_2x2(qf_M):
     [c, d] = qf_M[1]
     det_M = a*d - b*c
     det_M_inv = SignedBinary(1) / det_M
+    det_M_inv_neg = -det_M
 
-    M_inv = [[det_M_inv*d, -det_M_inv*b], [-det_M_inv*c, -det_M_inv*d]]
+    M_inv = [[det_M_inv*d, det_M_inv_neg*b], [det_M_inv_neg*c, det_M_inv*a]]
     return M_inv
 
 
