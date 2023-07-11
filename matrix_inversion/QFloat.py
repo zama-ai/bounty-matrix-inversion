@@ -356,7 +356,7 @@ class QFloat():
             ints = array.size//2
         else:
             if not (isinstance(ints, int) and 0<=ints and array.size>=ints):
-                raise ValueError('ints must be in range [1,array.size]')
+                raise ValueError('ints must be in range [0,array.size]')
         self._ints = int(ints)
         self._isTidy = isTidy # wether array is tidy (with mixed signs or with abs values >= base)
         self._isBaseTidy = isTidy # wether array is tidy for values (abs values >= base) but signs can be mixed
