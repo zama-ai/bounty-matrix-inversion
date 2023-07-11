@@ -85,7 +85,6 @@ def lu_inverse(P, L, U):
     X = np.zeros((n, n))
     for i in range(n - 1, -1, -1):
         X[i, -1] = Y[i, -1] / U[-1, -1]
-        print('Ujj ', U[j, j])
         for j in range(n - 2, -1, -1):
             X[i, j] = (Y[i, j] - np.dot(U[j, j+1:], X[i, j+1:])) / U[j, j]
 
@@ -764,15 +763,6 @@ def test_qf_inverse_fhe(circuit, sampler, params):
 
     [n, qf_len, qf_ints, qf_base, qf_len_out, qf_ints_out] = params
     qf_Res_sim = run_qf_circuit_fhe(circuit, M, qf_len, qf_ints, qf_base, qf_ints_out, True)
-    qf_Res = run_qf_circuit_fhe(circuit, M, qf_len, qf_ints, qf_base, qf_ints_out, False)
-
-    print('QFloat inverse (simulating):')
-    print(qf_Res_sim)
-    print(' ')
-
-    print('QFloat inverse :')
-    print(qf_Res)
-    print(' ')
 
     print('LU inveres :')
     print(matrix_inverse(M))
@@ -780,6 +770,16 @@ def test_qf_inverse_fhe(circuit, sampler, params):
 
     print('Scipy inv :')    
     print(sc.linalg.inv(M))    
+
+    print('QFloat inverse (simulating):')
+    print(qf_Res_sim)
+    print(' ')
+
+    qf_Res = run_qf_circuit_fhe(circuit, M, qf_len, qf_ints, qf_base, qf_ints_out, False)
+
+    print('QFloat inverse :')
+    print(qf_Res)
+    print(' ')
 
 
 if __name__ == '__main__':
@@ -801,7 +801,7 @@ if __name__ == '__main__':
     # test inverse qf python
     # ----------------------
     # QFloat.resetStats()
-    test_qf_inverse_python(sampler, params)
+    #test_qf_inverse_python(sampler, params)
     # QFloat.showStats()
 
     # test pivot in fhe:
@@ -827,8 +827,8 @@ if __name__ == '__main__':
 
     # test inversion in fhe:
     # -----------------------------
-    # QFloat.resetStats()
-    # circuit = compile_circuit(params, sampler, keep_tidy=True)
-    # QFloat.showStats()
-    # test_qf_inverse_fhe(circuit, sampler, params)
+    QFloat.resetStats()
+    circuit = compile_circuit(params, sampler, keep_tidy=True)
+    QFloat.showStats()
+    test_qf_inverse_fhe(circuit, sampler, params)
 

@@ -932,11 +932,11 @@ class QFloat():
                 # compute only needed multiplication of b._array*a._array[i], accounting for crops
                 ind1 = 0 if indb >=0 else -indb
                 ind2 = min(len(b),newlength-indb)
-                #if ind2>ind1:
-                mul = b._array[ind1:ind2]*a._array[i]
-                 #   if ind2-ind1==1:
-                  #      mul = mul.reshape(1)
-                insert_array_at_index(mul, mularray, i, indb+ind1)
+                if ind2>ind1:
+                    mul = b._array[ind1:ind2]*a._array[i]
+                    if ind2-ind1==1:
+                        mul = mul.reshape(1)
+                    insert_array_at_index(mul, mularray, i, indb+ind1)
 
             # the multiplication array is made from the sum of the muarray rows
             multiplication = QFloat(np.sum(mularray, axis=0), newints, a._base, False)
