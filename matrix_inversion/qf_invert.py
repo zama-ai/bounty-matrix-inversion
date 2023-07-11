@@ -420,6 +420,8 @@ def qf_inverse_2x2(qf_M, qf_len_out, qf_ints_out):
     mul = lambda x,y: QFloat.fromMul(x, y, qf_len_out, qf_ints_out)
     M_inv = [[mul(d, det_inv), mul(b, det_inv_n)], [mul(c, det_inv_n), mul(a, det_inv)]]
 
+    # mul = lambda x,y: QFloat.fromMul(x, y, qf_len_out, qf_ints_out)
+    # M_inv = [[mul(det_inv, SignedBinary(1)), mul(det_inv, SignedBinary(1))], [mul(det_inv, SignedBinary(1)), mul(det_inv, SignedBinary(1))]]    
     return M_inv
 
 
@@ -646,6 +648,8 @@ def compile_circuit(params, sampler, keep_tidy=True, circuit_function=qf_matrix_
 
     QFloat.KEEP_TIDY=keep_tidy
 
+    [n, qf_len, qf_ints, qf_base, _, _] = params
+
     inputset=[]
     for i in range(100):
         M = sampler()
@@ -761,7 +765,7 @@ def test_qf_inverse_fhe(circuit, sampler, params, simulate=False):
 
 if __name__ == '__main__':
 
-    n=2; qf_len = 12; qf_ints = 9; qf_base = 2; qf_len_out=16; qf_ints_out = 2;
+    n=2; qf_len = 12; qf_ints = 9; qf_base = 2; qf_len_out=12; qf_ints_out = 0;
 
     normal_sampler = ("Normal", lambda: np.random.randn(n, n) * 100)
     uniform_sampler = ("Uniform", lambda: np.random.uniform(0, 100, (n, n)))

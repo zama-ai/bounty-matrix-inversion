@@ -349,12 +349,12 @@ class QFloat():
         if not (isinstance(base, int) and base > 1):
             raise ValueError('base must be a int >1')
         self._base = base       
-        if not ints:
+        if ints is None:
             ints = array.size//2
         else:
-            if not (isinstance(ints, int) and 0<ints and array.size>=ints):
+            if not (isinstance(ints, int) and 0<=ints and array.size>=ints):
                 raise ValueError('ints must be in range [1,array.size]')
-        self._ints = ints
+        self._ints = int(ints)
         self._isTidy = isTidy # wether array is tidy (with mixed signs or with abs values >= base)
         self._isBaseTidy = isTidy # wether array is tidy for values (abs values >= base) but signs can be mixed
         self._sign = sign # sign if known
@@ -436,7 +436,7 @@ class QFloat():
 
         WARNING : will return an unencrypted QFLoat
         """
-        if not ints:
+        if ints is None:
             ints = length//2
 
         integerPart = int(f)
@@ -531,26 +531,27 @@ class QFloat():
         else:
             return self._array[:]
 
-    def set_len_ints(newlen, newints):
+    def set_len_ints(self, newlen, newints):
         """
         Set new length and new ints
         WARNING : This operation may troncate the int or float part
         """
+        zeros = fhe.zeros if self._encrypted else lambda x: np.zeros(x, dtype='int')
         # set ints
-        if newints > self.ints:
-            lib = fhe if self._encrypted else np
-            self._array = np.concatenate( lib.zeros(newints - self.ints), self._array)
-        else:
-            self._array = self._array[self.ints - newints:]
-        self._ints = newints
+        if self._ints != newints:
+            if newints > self._ints:
+                self._array = np.concatenate( (zeros(int(newints - self._ints)), self._array), axis=0)
+            else:
+                self._array = self._array[self._ints - newints:]
+            self._ints = int(newints)
 
         # set length
-        difflen = newlen - len(self)
-        if diff >0:
-            lib = fhe if self._encrypted else np
-            self._array = np.concatenate(self._array, lib.zeros(diff))
-        else:
-            self._array = self._array[:-diff]
+        difflen = int(newlen - len(self))
+        if difflen!=0:
+            if difflen >0:
+                self._array = np.concatenate((self._array, zeros(difflen)),axis=0)
+            else:
+                self._array = self._array[:-difflen]
 
     def checkCompatibility(self, other):
         """
@@ -922,9 +923,8 @@ class QFloat():
             # A QFloat array is made of 2 parts, integer part and float part
             # The multiplication array will be the sum of a.integer * b + a.float * b
             mularray = fhe.zeros((len(a), newlength))
-            # integer part, shift  to the left
             for i in range(0,len(a)):
-                # index from b where the array mul should be inserted in mularray
+                # index from b where the array mul should be inserted in mularray, depending on integer or float part
                 indb = newints-a._ints+i+1-b._ints if i<a._ints else newints-a._ints+i+1-b._ints
                 # compute only needed multiplication of b._array*a._array[i], accounting for crops
                 ind1 = 0 if indb >=0 else -indb
