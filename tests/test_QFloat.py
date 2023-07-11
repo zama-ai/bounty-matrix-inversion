@@ -1,4 +1,4 @@
-import sys, os
+import sys, os, time
 
 import unittest
 import numpy as np
@@ -14,50 +14,137 @@ base=2
 floatLenght = 8
 QFloat.KEEP_TIDY=False
 
-# TODO
-# class QFloatCircuit:
+
+def print_red(text):
+    # ANSI escape sequence for red color
+    red_color = "\033[91m"
+    # ANSI escape sequence to reset color back to default
+    reset_color = "\033[0m"
+    # Print text in red
+    print(red_color + text + reset_color)    
+
+def measure_time(function, descripton, *inputs):
+    #Compute a function on inputs and return output along with duration
+    print(descripton+' ...', end="", flush=True)
+    print("\r", end="")
+    start = time.time()
+    output = function(*inputs)
+    end = time.time()
+    print(f"|  {descripton} : {end-start:.2f} s  |")
+    return output
+
+def float_array_to_qfloat_arrays(arr, qf_len, qf_ints, qf_base):
+    """
+    converts a float list to arrays representing qfloats
+    """
+    qf_array = [ QFloat.fromFloat(f, qf_len, qf_ints, qf_base) for f in arr]
+    n=len(qf_array)
+    qf_arrays = fhe.zeros((n, qf_len))
+    qf_signs = fhe.zeros(n)
+    for i in range(n):
+        qf_arrays[i,:] = qf_array[i].toArray()
+        qf_signs[i] = qf_array[i].getSign()
+
+    return qf_arrays, qf_signs
+
+def qfloat_arrays_to_qfloat_list(qf_arrays, qf_signs, qf_ints, qf_base):
+    """
+    converts qfloats arrays to a QFloat matrix
+    """
+    n = int(qf_arrays.shape[0])
+    qf_L = []
+    for i in range(n):
+        qf = QFloat(qf_arrays[i,:], qf_ints, qf_base, True, qf_signs[i])
+        qf_L.append(qf)
+
+    return qf_L
+
+def qfloat_list_to_qfloat_arrays(L, qf_len, qf_ints, qf_base):
+    """
+    converts a QFloat 2D-list matrix to integer arrays 
+    """
+    n=len(L)
+    qf_arrays = fhe.zeros((n, qf_len))
+    for i in range(n):
+        if isinstance(L[i], QFloat):
+            qf_arrays[i,:] = L[i].toArray()
+        elif isinstance(L[i], SignedBinary):
+            qf_arrays[i,qf_ints-1] = L[i].value
+        elif isinstance(L[i], Zero):
+            qf_arrays[i,qf_ints-1] = 0
+        else:
+            qf_arrays[i,qf_ints-1] = L[i]
+
+    return qf_arrays
+
+def qfloat_arrays_to_float_array(qf_arrays, qf_ints, qf_base):
+    """
+    converts qfloats arrays to a float matrix
+    """
+    n = int(qf_arrays.shape[0])
+    arr=np.zeros(n)
+    for i in range(n):
+        arr[i] = QFloat(qf_arrays[i,:], qf_ints, qf_base).toFloat()
+
+    return arr
+
+
+
+class QFloatCircuit:
    
-#     """
-#     Circuit factory class for testing FheSeq on 2 sequences input
-#     """
-#     def __init__(self, length, base=2, simulate=False):
-#         self.length=length
-#         self.inputset=[
-#             (np.random.randint(-base, base, size=(length,)),
-#             np.random.randint(-base, base, size=(length,)))
-#             for _ in range(100)
-#         ]
-#         self.circuit = None
-#         self.simulate = simulate
+    """
+    Circuit factory class for testing FheSeq on 2 sequences input
+    """
+    def __init__(self, n, circuit_function, qf_len, qf_ints, qf_base, verbose=False):
+        inputset=[]
+        for i in range(100):
+            floatList = [np.random.randn(1)[0] * 100 for i in range(n)]
+            qf_arrays, qf_signs = float_array_to_qfloat_arrays(floatList, qf_len, qf_ints, qf_base)
+            inputset.append((qf_arrays, qf_signs))
 
-#     def set(self, circuitFunction, verbose=False):
-#         compiler = fhe.Compiler(lambda data1,data2: circuitFunction(data1, data2), {"data1": "encrypted", "data2": "encrypted"})
-#         self.circuit = compiler.compile(
-#             inputset=self.inputset,
-#             configuration=fhe.Configuration(
-#                 enable_unsafe_features=True,
-#                 use_insecure_key_cache=True,
-#                 insecure_key_cache_location=".keys",
-#                 #dataflow_parallelize=True,
-#             ),
-#             verbose=verbose,
-#         )
+        params = [qf_len, qf_ints, qf_base]
+        compiler = fhe.Compiler(lambda x,y: circuit_function(x,y,params), {"x": "encrypted", "y": "encrypted"})
+        make_circuit = lambda : compiler.compile(
+            inputset=inputset,
+            configuration=fhe.Configuration(
+                enable_unsafe_features=True,
+                use_insecure_key_cache=True,
+                insecure_key_cache_location=".keys",
+                #dataflow_parallelize=True,
+            ),
+            verbose=False,
+        )
+        self.qf_len = qf_len
+        self.qf_ints = qf_ints
+        self.qf_base = qf_base
+
+        self.circuit = measure_time( make_circuit, 'Compiling')
+
     
-#     def run(self, array1, array2):
-#         if not self.circuit: raise Error('circuit was not set')
-#         assert len(array1) == self.seq_length, f"Sequence 1 length is not correct, should be {self.seq_length} characters"
-#         assert len(array2) == self.seq_length, f"Sequence 2 length is not correct, should be {self.seq_length} characters"
+    def run(self, floatList, simulate=False, raw_output=False):
+        if not self.circuit: raise Error('circuit was not set')
+        qf_arrays, qf_signs = float_array_to_qfloat_arrays(floatList, self.qf_len, self.qf_ints, self.qf_base)
 
-#         return self.circuit.simulate(array1, array2) if self.simulate else self.circuit.encrypt_run_decrypt(array1, array2)
+        # Run FHE
+        if not simulate:
+            encrypted = measure_time(self.circuit.encrypt, 'Encrypting', qf_arrays, qf_signs)
+            run = measure_time(self.circuit.run,'Running', encrypted)
+            decrypted = self.circuit.decrypt(run)
+        else:
+            decrypted = measure_time(self.circuit.simulate,'Simulating', qf_arrays, qf_signs)
 
+        if not raw_output:
+            qf_Res = qfloat_arrays_to_float_array(decrypted, self.qf_ints, self.qf_base)
+        else:
+            qf_Res = decrypted
+
+        return qf_Res
 
 
 
 class TestQFloat(unittest.TestCase):
 
-
-
- #########################  NON FHE TESTS #########################
+ ##################################################  NON FHE TESTS ##################################################
 
     def test_conversion_np(self):
 
@@ -219,11 +306,46 @@ class TestQFloat(unittest.TestCase):
             assert(qf.getSign() == (np.sign(f) or 1)) # check computed sign as well
 
 
-######################### FHE TESTS #########################
-# TODO
 
+##################################################  FHE TESTS ##################################################
+
+    def test_add_sub_fhe(self):
+        # test add and sub
+
+        def add_qfloats(qf_arrays, qf_signs, params):
+            qf_len, qf_ints, qf_base = params
+            a,b = qfloat_arrays_to_qfloat_list(qf_arrays, qf_signs, qf_ints, qf_base)
+            res = [a+b]
+            return qfloat_list_to_qfloat_arrays(res, qf_len, qf_ints, qf_base)
+
+        for i in range(10):
+            #base = np.random.randint(2,10)
+            base = 2
+            size = np.random.randint(20,30)
+            ints = np.random.randint(12, 16)
+            f1 = np.random.randn(1)[0]*100
+            f2 = np.random.randn(1)[0]*100
+
+            circuit = QFloatCircuit(2, add_qfloats, size, ints, base)
+            addition = circuit.run(np.array([f1,f2]), True)
+            print('f1, f2 ', f1, f2)
+            print('addition ', f1+f2, addition)
+
+            # assert( (2+qf1).toFloat() - (2+f1) < 0.1)
+            # assert( (qf1+2).toFloat() - (2+f1) < 0.1)
+            # assert( (SignedBinary(1)+qf1).toFloat() - (1+f1) < 0.1)
+
+            # assert( (2-qf1).toFloat() - (2-f1) < 0.1)
+            # assert( (qf1-2).toFloat() - (f1-2) < 0.1)
+            # assert( (SignedBinary(1)-qf1).toFloat() - (1-f1) < 0.1)            
+
+            # qf2 = QFloat.fromFloat(f2, size, ints, base)
+            # assert( (qf1+qf2).toFloat()-(f1+f2) < 0.1 )
+            # assert( (qf1-qf2).toFloat()-(f1-f2) < 0.1 )
+            # qf1 += qf2
+            # assert( qf1.toFloat()-(f1+f2) < 0.1 ) # iadd
 
 #unittest.main()
 
-suite = unittest.TestLoader().loadTestsFromName('test_QFloat.TestQFloat.test_mul_np')
+suite = unittest.TestLoader().loadTestsFromName('test_QFloat.TestQFloat.test_add_sub_fhe')
 unittest.TextTestRunner(verbosity=1).run(suite)
