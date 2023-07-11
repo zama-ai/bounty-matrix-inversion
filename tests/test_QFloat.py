@@ -33,7 +33,7 @@ def measure_time(function, descripton, *inputs):
     print(f"|  {descripton} : {end-start:.2f} s  |")
     return output
 
-def float_array_to_qfloat_arrays(arr, qf_len, qf_ints, qf_base):
+def float_array_to_qfloat_arrays_fhe(arr, qf_len, qf_ints, qf_base):
     """
     converts a float list to arrays representing qfloats
     """
@@ -46,6 +46,21 @@ def float_array_to_qfloat_arrays(arr, qf_len, qf_ints, qf_base):
         qf_signs[i] = qf_array[i].getSign()
 
     return qf_arrays, qf_signs
+
+def float_array_to_qfloat_arrays_python(arr, qf_len, qf_ints, qf_base):
+    """
+    converts a float list to arrays representing qfloats
+    """
+    qf_array = [ QFloat.fromFloat(f, qf_len, qf_ints, qf_base) for f in arr]
+    n=len(qf_array)
+    qf_arrays = np.zeros((n, qf_len), dtype='int')
+    qf_signs = np.zeros(n, dtype='int')
+    for i in range(n):
+        qf_arrays[i,:] = qf_array[i].toArray()
+        qf_signs[i] = qf_array[i].getSign()
+
+    return qf_arrays, qf_signs
+
 
 def qfloat_arrays_to_qfloat_list(qf_arrays, qf_signs, qf_ints, qf_base):
     """
@@ -98,8 +113,8 @@ class QFloatCircuit:
     def __init__(self, n, circuit_function, qf_len, qf_ints, qf_base, verbose=False):
         inputset=[]
         for i in range(100):
-            floatList = [np.random.randn(1)[0] * 100 for i in range(n)]
-            qf_arrays, qf_signs = float_array_to_qfloat_arrays(floatList, qf_len, qf_ints, qf_base)
+            floatList = [np.random.uniform(0,100,1)[0] for i in range(n)]
+            qf_arrays, qf_signs = float_array_to_qfloat_arrays_python(floatList, qf_len, qf_ints, qf_base)
             inputset.append((qf_arrays, qf_signs))
 
         params = [qf_len, qf_ints, qf_base]
@@ -123,10 +138,11 @@ class QFloatCircuit:
     
     def run(self, floatList, simulate=False, raw_output=False):
         if not self.circuit: raise Error('circuit was not set')
-        qf_arrays, qf_signs = float_array_to_qfloat_arrays(floatList, self.qf_len, self.qf_ints, self.qf_base)
+        qf_arrays, qf_signs = float_array_to_qfloat_arrays_fhe(floatList, self.qf_len, self.qf_ints, self.qf_base)
 
         # Run FHE
         if not simulate:
+            print(qf_arrays, qf_signs)
             encrypted = measure_time(self.circuit.encrypt, 'Encrypting', qf_arrays, qf_signs)
             run = measure_time(self.circuit.run,'Running', encrypted)
             decrypted = self.circuit.decrypt(run)
@@ -323,29 +339,37 @@ class TestQFloat(unittest.TestCase):
             base = 2
             size = np.random.randint(20,30)
             ints = np.random.randint(12, 16)
-            f1 = np.random.randn(1)[0]*100
-            f2 = np.random.randn(1)[0]*100
+            f1 = np.random.uniform(0,100,1)[0]
+            f2 = np.random.uniform(0,100,1)[0]
 
             circuit = QFloatCircuit(2, add_qfloats, size, ints, base)
-            addition = circuit.run(np.array([f1,f2]), True)
-            print('f1, f2 ', f1, f2)
-            print('addition ', f1+f2, addition)
+            addition = circuit.run(np.array([f1,f2]), False)[0]
+            assert(addition  - (f1+f2) < 0.01)
 
-            # assert( (2+qf1).toFloat() - (2+f1) < 0.1)
-            # assert( (qf1+2).toFloat() - (2+f1) < 0.1)
-            # assert( (SignedBinary(1)+qf1).toFloat() - (1+f1) < 0.1)
 
-            # assert( (2-qf1).toFloat() - (2-f1) < 0.1)
-            # assert( (qf1-2).toFloat() - (f1-2) < 0.1)
-            # assert( (SignedBinary(1)-qf1).toFloat() - (1-f1) < 0.1)            
+    def test_mul_fhe(self):
+        # test add and sub
 
-            # qf2 = QFloat.fromFloat(f2, size, ints, base)
-            # assert( (qf1+qf2).toFloat()-(f1+f2) < 0.1 )
-            # assert( (qf1-qf2).toFloat()-(f1-f2) < 0.1 )
-            # qf1 += qf2
-            # assert( qf1.toFloat()-(f1+f2) < 0.1 ) # iadd
+        def mul_qfloats(qf_arrays, qf_signs, params):
+            qf_len, qf_ints, qf_base = params
+            a,b = qfloat_arrays_to_qfloat_list(qf_arrays, qf_signs, qf_ints, qf_base)
+            res = [a*b]
+            return qfloat_list_to_qfloat_arrays(res, qf_len, qf_ints, qf_base)
+
+        for i in range(10):
+            #base = np.random.randint(2,10)
+            base = 2
+            size = np.random.randint(20,30)
+            ints = np.random.randint(12, 16)
+            f1 = np.random.uniform(0,100,1)[0]
+            f2 = np.random.uniform(0,100,1)[0]
+
+            circuit = QFloatCircuit(2, mul_qfloats, size, ints, base)
+            multiplication = circuit.run(np.array([f1,f2]), True)[0]
+            assert(multiplication  - (f1*f2) < 0.01)
+
 
 #unittest.main()
 
-suite = unittest.TestLoader().loadTestsFromName('test_QFloat.TestQFloat.test_add_sub_fhe')
+suite = unittest.TestLoader().loadTestsFromName('test_QFloat.TestQFloat.test_mul_fhe')
 unittest.TextTestRunner(verbosity=1).run(suite)
