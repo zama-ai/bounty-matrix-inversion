@@ -166,16 +166,19 @@ def is_greater_or_equal_base_p(a, b):
         return is_greater_or_equal(a[-diff:], b) | (np.sum(a[0:-diff])>0)
 
 
-def insert_array_at_index(a, b, i):
+def insert_array_at_index(a, B, i, j):
+    """
+    Insert elements of array a into array B[i,:] starting at index j
+    """
     # Case when i is negative
-    if i < 0:
-        # We will take elements of a starting at index -i
-        a = a[-i:]
-        i = 0
+    if j < 0:
+        # We will take elements of a starting at index -j
+        a = a[-j:]
+        j = 0
     # Compute the number of elements we can insert from a into b
-    n = min(b.size - i, a.size)
-    # Insert elements from a into b
-    b[i:i+n] = a[:n]
+    n = min(B[i].size - j, a.size)
+    # Insert elements from a into B[i]
+    B[i,j:j+n] = a[:n]
 
 
 #=======================================================================================================================
@@ -737,7 +740,7 @@ class QFloat():
         """
         If qf is not encrypted and condition is verified, convert qf array to fhe array
         """
-        if not qf._encrypted and condition:
+        if (not qf._encrypted) and condition:
             fhe_array = fhe.ones(len(qf)) * qf._array
             qf._array = fhe_array
             qf._encrypted = True
@@ -924,13 +927,13 @@ class QFloat():
             # The multiplication array will be the sum of a.integer * b + a.float * b
             mularray = fhe.zeros((len(a), newlength))
             for i in range(0,len(a)):
-                # index from b where the array mul should be inserted in mularray, depending on integer or float part
-                indb = newints-a._ints+i+1-b._ints if i<a._ints else newints-a._ints+i+1-b._ints
+                # index from b where the array mul should be inserted in mularray 
+                indb = newints-a._ints+i+1-b._ints
                 # compute only needed multiplication of b._array*a._array[i], accounting for crops
                 ind1 = 0 if indb >=0 else -indb
                 ind2 = max(len(b),newlength-indb)
                 mul = b._array[ind1:ind2]*a._array[i]
-                insert_array_at_index(mul, mularray[i], indb+ind1)
+                insert_array_at_index(mul, mularray, i, indb+ind1)
 
             # the multiplication array is made from the sum of the muarray rows
             multiplication = QFloat(np.sum(mularray, axis=0), newints, a._base, False)
