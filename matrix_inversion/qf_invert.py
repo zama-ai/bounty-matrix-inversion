@@ -391,10 +391,6 @@ def qf_lu_inverse(P, L, U, qf_len_out, qf_ints_out):
     # precompute inverse of U to make less divisions
     [ U[j][j].set_len_ints(10,8) for j in range(n)] # simplify U as we know its range
     Ujj_inv = [U[j][j].invert(1, 20, 0) for j in range(n)]
-
-    # for j in range(n):
-    #     print('Ujj',j, U[j][j].toFloat())
-    #     print('Ujj_inv',j, Ujj_inv[j].toFloat())
     for i in range(n - 1, -1, -1):
         X[i][-1] = QFloat.fromMul(Y[i][-1],Ujj_inv[-1], qf_len_out, qf_ints_out )
         for j in range(n - 2, -1, -1):
@@ -406,7 +402,7 @@ def qf_lu_inverse(P, L, U, qf_len_out, qf_ints_out):
 
 ########################################################################################
 #                            2x2 and 3x3 SHORCUT FORMULAS
-########################################################################################
+################2#######################################################################
 
 def qf_inverse_2x2(qf_M, qf_len_out, qf_ints_out):
     """
@@ -508,24 +504,16 @@ def qf_matrix_inverse(qf_arrays, qf_signs, params):
     # reconstruct the matrix of QFloats with encrypted values:
     qf_M = qfloat_arrays_to_QFloat_matrix(qf_arrays, qf_signs, qf_ints, qf_base)
 
-    # if n==2:
-    #     # use shortcut formula
-    #     qf_Minv = qf_inverse_2x2(qf_M, qf_len_out, qf_ints_out)
+    if n==2:
+        # use shortcut formula
+        qf_Minv = qf_inverse_2x2(qf_M, qf_len_out, qf_ints_out)
 
-    # else:
-    #     # compute the LU decomposition
-    #     bin_P, qf_L, qf_U = qf_lu_decomposition(qf_M)
+    else:
+        # compute the LU decomposition
+        bin_P, qf_L, qf_U = qf_lu_decomposition(qf_M)
 
-    #     # compute inverse from P L U
-    #     qf_Minv = qf_lu_inverse(bin_P, qf_L, qf_U)
-
-
-    # compute the LU decomposition
-    bin_P, qf_L, qf_U = qf_lu_decomposition(qf_M)
-
-    # compute inverse from P L U
-    qf_Minv = qf_lu_inverse(bin_P, qf_L, qf_U, qf_len_out, qf_ints_out)
-
+        # compute inverse from P L U
+        qf_Minv = qf_lu_inverse(bin_P, qf_L, qf_U, qf_len_out, qf_ints_out)
 
     # break the resulting QFloats into arrays:
     qf_inv_arrays = qfloat_matrix_to_arrays(qf_Minv, qf_len_out, qf_ints_out, qf_base)
@@ -633,8 +621,9 @@ def test_qf_inverse_python(sampler, params):
     # convert it to QFloat arrays
     qf_arrays, qf_signs = float_matrix_to_qfloat_arrays(M, qf_len, qf_ints, qf_base)
 
-    QFloat.KEEP_TIDY=True
+    start = time.time()
     output = qf_matrix_inverse(qf_arrays, qf_signs, params)
+    end = time.time()
 
     qf_Res = qfloat_arrays_to_float_matrix(output, qf_ints_out, qf_base)
 
@@ -648,8 +637,7 @@ def test_qf_inverse_python(sampler, params):
     print('\nScipy inv :')    
     print(sc.linalg.inv(M))   
 
-    print('\nScipy inv int :')    
-    print(sc.linalg.inv(M.astype('int')))       
+    print(f"\n|  Took : {end-start:.4f} s  |\n") 
 
 
 
@@ -658,9 +646,7 @@ def test_qf_inverse_python(sampler, params):
 #                                           FHE
 ########################################################################################
 
-def compile_circuit(params, sampler, keep_tidy=True, circuit_function=qf_matrix_inverse):
-
-    QFloat.KEEP_TIDY=keep_tidy
+def compile_circuit(params, sampler, circuit_function=qf_matrix_inverse):
 
     [n, qf_len, qf_ints, qf_base, _, _] = params
 
@@ -681,8 +667,6 @@ def compile_circuit(params, sampler, keep_tidy=True, circuit_function=qf_matrix_
         ),
         verbose=False,
     )
-
-    QFloat.KEEP_TIDY=True
 
     circuit = measure_time( make_circuit, 'Compiling')
     return circuit
@@ -769,7 +753,8 @@ def test_qf_inverse_fhe(circuit, sampler, params):
     print(' ') 
 
     print('Scipy inv :')    
-    print(sc.linalg.inv(M))    
+    print(sc.linalg.inv(M)) 
+    print(' ')   
 
     print('QFloat inverse (simulating):')
     print(qf_Res_sim)
@@ -784,8 +769,8 @@ def test_qf_inverse_fhe(circuit, sampler, params):
 
 if __name__ == '__main__':
 
-    #n=2; qf_len = 12; qf_ints = 9; qf_base = 2; qf_len_out=14; qf_ints_out = 0;
-    n=2; qf_len = 12; qf_ints = 9; qf_base = 2; qf_len_out=20; qf_ints_out = 8;
+    n=2; qf_len = 12; qf_ints = 9; qf_base = 2; qf_len_out=14; qf_ints_out = 0;
+    #n=3; qf_len = 12; qf_ints = 9; qf_base = 2; qf_len_out=20; qf_ints_out = 8;
 
     normal_sampler = ("Normal", lambda: np.random.randn(n, n) * 100)
     uniform_sampler = ("Uniform", lambda: np.random.uniform(0, 100, (n, n)))
@@ -800,35 +785,35 @@ if __name__ == '__main__':
 
     # test inverse qf python
     # ----------------------
-    # QFloat.resetStats()
-    #test_qf_inverse_python(sampler, params)
-    # QFloat.showStats()
+    QFloat.resetStats()
+    test_qf_inverse_python(sampler, params)
+    QFloat.showStats()
 
     # test pivot in fhe:
     # ------------------
     #QFloat.resetStats()
-    # circuit = compile_circuit(n, qf_len, qf_ints, qf_base, sampler, keep_tidy=False, circuit_function=qf_pivot)
+    # circuit = compile_circuit(n, qf_len, qf_ints, qf_base, sampler, circuit_function=qf_pivot)
     #QFloat.showStats()
     # test_qf_pivot_fhe(circuit, sampler, qf_len, qf_ints, qf_base, simulate=False)
 
     # test LU U decomposition in fhe:
     # -----------------------------
-    #QFloat.resetStats()
-    # circuit = compile_circuit(n, qf_len, qf_ints, qf_base, sampler, keep_tidy=False, circuit_function=qf_lu_U)
-    #QFloat.showStats()
+    # QFloat.resetStats()
+    # circuit = compile_circuit(n, qf_len, qf_ints, qf_base, sampler, circuit_function=qf_lu_U)
+    # QFloat.showStats()
     # test_qf_LU_U_fhe(circuit, sampler, qf_len, qf_ints, qf_base, simulate=False)
 
     # test LU L decomposition in fhe:
     # -----------------------------
     # QFloat.resetStats()
-    # circuit = compile_circuit(params, sampler, keep_tidy=True, circuit_function=qf_lu_L)
+    # circuit = compile_circuit(params, sampler, circuit_function=qf_lu_L)
     # QFloat.showStats()
     # test_qf_LU_L_fhe(circuit, params, simulate=True)    
 
     # test inversion in fhe:
     # -----------------------------
     QFloat.resetStats()
-    circuit = compile_circuit(params, sampler, keep_tidy=True)
+    circuit = compile_circuit(params, sampler)
     QFloat.showStats()
     test_qf_inverse_fhe(circuit, sampler, params)
 
