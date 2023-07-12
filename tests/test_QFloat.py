@@ -78,6 +78,8 @@ def qfloat_list_to_qfloat_arrays(L, qf_len, qf_ints, qf_base):
     """
     converts a QFloat 2D-list matrix to integer arrays 
     """
+    if not isinstance(L, list):
+        raise TypeError('L must be list')
     n=len(L)
     qf_arrays = fhe.zeros((n, qf_len))
     for i in range(n):
@@ -142,7 +144,6 @@ class QFloatCircuit:
 
         # Run FHE
         if not simulate:
-            print(qf_arrays, qf_signs)
             encrypted = measure_time(self.circuit.encrypt, 'Encrypting', qf_arrays, qf_signs)
             run = measure_time(self.circuit.run,'Running', encrypted)
             decrypted = self.circuit.decrypt(run)
@@ -365,11 +366,58 @@ class TestQFloat(unittest.TestCase):
             f2 = np.random.uniform(0,100,1)[0]
 
             circuit = QFloatCircuit(2, mul_qfloats, size, ints, base)
-            multiplication = circuit.run(np.array([f1,f2]), True)[0]
+            multiplication = circuit.run(np.array([f1,f2]), False)[0]
             assert(multiplication  - (f1*f2) < 0.01)
 
+    def test_div_fhe(self):
+        # test add and sub
 
-#unittest.main()
+        def div_qfloats(qf_arrays, qf_signs, params):
+            qf_len, qf_ints, qf_base = params
+            a,b = qfloat_arrays_to_qfloat_list(qf_arrays, qf_signs, qf_ints, qf_base)
+            res = [a/b]
+            return qfloat_list_to_qfloat_arrays(res, qf_len, qf_ints, qf_base)
 
-suite = unittest.TestLoader().loadTestsFromName('test_QFloat.TestQFloat.test_mul_fhe')
-unittest.TextTestRunner(verbosity=1).run(suite)
+        for i in range(10):
+            #base = np.random.randint(2,10)
+            base = 2
+            size = np.random.randint(20,30)
+            ints = np.random.randint(12, 16)
+            f1 = np.random.uniform(0,100,1)[0]
+            f2 = np.random.uniform(0,100,1)[0]
+
+            circuit = QFloatCircuit(2, div_qfloats, size, ints, base)
+            division = circuit.run(np.array([f1,f2]), False)[0]
+            assert(division  - (f1/f2) < 0.01)  
+
+
+    # def test_multi_fhe(self):
+    #     # test multi operations to count time
+
+    #     def multi_qfloats(qf_arrays, qf_signs, params):
+    #         qf_len, qf_ints, qf_base = params
+    #         a,b = qfloat_arrays_to_qfloat_list(qf_arrays, qf_signs, qf_ints, qf_base)
+    #         res = a+a+a+a-b
+    #         res = res*a*a
+            
+    #         return qfloat_list_to_qfloat_arrays([res], qf_len, qf_ints, qf_base)
+
+    #     for i in range(10):
+    #         #base = np.random.randint(2,10)
+    #         base = 2
+    #         size = np.random.randint(20,30)
+    #         ints = np.random.randint(12, 16)
+    #         f1 = np.random.uniform(0,100,1)[0]
+    #         f2 = np.random.uniform(0,100,1)[0]
+
+    #         QFloat.KEEP_TIDY=False
+    #         circuit = QFloatCircuit(2, multi_qfloats, size, ints, base)
+    #         multi = circuit.run(np.array([f1,f2]), False)[0]
+    #         QFloat.KEEP_TIDY=True
+    #         #assert(division  - (f1/f2) < 0.01)  
+
+
+unittest.main()
+
+# suite = unittest.TestLoader().loadTestsFromName('test_QFloat.TestQFloat.test_multi_fhe')
+# unittest.TextTestRunner(verbosity=1).run(suite)

@@ -599,7 +599,7 @@ class QFloat():
         if self._isBaseTidy:
             return
 
-        dividend = fhe.zeros(1)[0]
+        dividend = 0
         for i in reversed(range(len(self))):
             curr = self._array[i]+dividend
             dividend = (np.abs(curr) // self._base)*np.sign(curr)
@@ -725,6 +725,9 @@ class QFloat():
             self.checkCompatibility(other)
             addition = QFloat(self._array + other._array, self._ints, self._base, False)
 
+        # base tidy to keep bitwidth low
+        addition.baseTidy()
+
         if QFloat.KEEP_TIDY:
             addition.tidy()
 
@@ -775,6 +778,9 @@ class QFloat():
         self._isBaseTidy=False
         self._sign=None
 
+        # base tidy to keep bitwidth low
+        self.baseTidy()
+
         if QFloat.KEEP_TIDY:
             self.tidy()
 
@@ -797,6 +803,9 @@ class QFloat():
             self.checkCompatibility(other)
             subtraction = QFloat(self._array - other._array, self._ints, self._base, False)
         
+        # base tidy to keep bitwidth low
+        subtraction.baseTidy()
+
         if QFloat.KEEP_TIDY:
             subtraction.tidy()
 
@@ -834,6 +843,11 @@ class QFloat():
         else:
             QFloat.MULTIPLICATION+=1 # count only multiplications with other Qfloat
             # multiply with another compatible QFloat 
+
+            # always base tidy before a multiplication between to QFloats prevent multiplying big bitwidths
+            self.baseTidy()
+            other.baseTidy()
+
             self.selfCheckConvertFHE(other._encrypted)
             self.checkCompatibility(other)
 
@@ -858,6 +872,9 @@ class QFloat():
 
             self._isTidy=False
             self._isBaseTidy=False
+
+            # base tidy to keep bitwidth low
+            self.baseTidy()
 
         if QFloat.KEEP_TIDY:
             self.tidy()
@@ -916,6 +933,10 @@ class QFloat():
         else:
             QFloat.MULTIPLICATION+=1 # count only multiplications with other Qfloat
             
+            # always base tidy before a multiplication between to QFloats prevent multiplying big bitwidths
+            a.baseTidy()
+            b.baseTidy()
+
             # convert a to encrypted if needed
             QFloat.checkConvertFHE(a, b._encrypted)
 
@@ -945,6 +966,9 @@ class QFloat():
                 multiplication._sign = a._sign*b._sign
             else:
                 multiplication._sign=None
+
+            # base tidy to keep bitwidth low
+            multiplication.baseTidy()    
 
             if QFloat.KEEP_TIDY:
                 multiplication.tidy()
