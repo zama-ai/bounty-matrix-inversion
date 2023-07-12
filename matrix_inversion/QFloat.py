@@ -314,12 +314,14 @@ class QFloat():
     A class for quantizing floats
     Floats are encoded as encrypted or unencrypted arrays of integers in a specified base (the fastest for fhe is base 2)
     Encrypted QFloat can be summed, multiplied etc. with unencrypted QFloats, and vice-versa
+
+    TODO: replace length + ints with length + dot position where dot position can be negative to encode efficiently
+    for very low numbers. For isntance: 0.000000001110 encoded as -.--------1110 with dot position = -8
+    TODO: fast inversion algorithm using dichotomia search
     """
 
     # keepTidy: wether to keep arrays tidy at all time. Setting to False can save time in FHE.
-    # Use it with caution because it can increase bitwidth too much in FHE:
-    # to prevent this, you may need to manually tidy some QFloats in your algorithm to prevent
-    KEEP_TIDY=True
+    KEEP_TIDY=False
 
     # Statistics for counting operations between QFloats within a circuit
     ADDITIONS=0
