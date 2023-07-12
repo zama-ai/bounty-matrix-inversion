@@ -8,6 +8,7 @@ sys.path.append(os.getcwd())
 
 from matrix_inversion.QFloat import QFloat, SignedBinary
 
+QFloat.KEEP_TIDY=False
 
 def print_red(text):
     # ANSI escape sequence for red color
@@ -159,6 +160,7 @@ class TestQFloat(unittest.TestCase):
 
     def test_add_sub_fhe(self):
         # test add and sub
+        print('test_add_sub_fhe')
 
         def add_qfloats(qf_arrays, qf_signs, params):
             qf_len, qf_ints, qf_base = params
@@ -167,8 +169,7 @@ class TestQFloat(unittest.TestCase):
             return qfloat_list_to_qfloat_arrays(res, qf_len, qf_ints, qf_base)
 
         for i in range(10):
-            #base = np.random.randint(2,10)
-            base = 2
+            base = np.random.randint(2,10)
             size = np.random.randint(20,30)
             ints = np.random.randint(12, 16)
             f1 = np.random.uniform(0,100,1)[0]
@@ -181,6 +182,7 @@ class TestQFloat(unittest.TestCase):
 
     def test_mul_fhe(self):
         # test add and sub
+        print('test_mul_fhe')
 
         def mul_qfloats(qf_arrays, qf_signs, params):
             qf_len, qf_ints, qf_base = params
@@ -188,11 +190,10 @@ class TestQFloat(unittest.TestCase):
             res = [a*b]
             return qfloat_list_to_qfloat_arrays(res, qf_len, qf_ints, qf_base)
 
-        for i in range(10):
-            #base = np.random.randint(2,10)
-            base = 2
+        for i in range(1):
+            base = np.random.randint(2,10)
             size = np.random.randint(20,30)
-            ints = np.random.randint(12, 16)
+            ints = size//2#np.random.randint(12, 16)
             f1 = np.random.uniform(0,100,1)[0]
             f2 = np.random.uniform(0,100,1)[0]
 
@@ -202,6 +203,7 @@ class TestQFloat(unittest.TestCase):
 
     def test_div_fhe(self):
         # test add and sub
+        print('test_div_fhe')
 
         def div_qfloats(qf_arrays, qf_signs, params):
             qf_len, qf_ints, qf_base = params
@@ -210,8 +212,7 @@ class TestQFloat(unittest.TestCase):
             return qfloat_list_to_qfloat_arrays(res, qf_len, qf_ints, qf_base)
 
         for i in range(10):
-            #base = np.random.randint(2,10)
-            base = 2
+            base = np.random.randint(2,10)
             size = np.random.randint(20,30)
             ints = np.random.randint(12, 16)
             f1 = np.random.uniform(0,100,1)[0]
@@ -222,33 +223,31 @@ class TestQFloat(unittest.TestCase):
             assert(division  - (f1/f2) < 0.01)  
 
 
-    # def test_multi_fhe(self):
-    #     # test multi operations to count time
+    def test_multi_fhe(self):
+        # test multi operations to count time
+        print('test_multi_fhe')
 
-    #     def multi_qfloats(qf_arrays, qf_signs, params):
-    #         qf_len, qf_ints, qf_base = params
-    #         a,b = qfloat_arrays_to_qfloat_list(qf_arrays, qf_signs, qf_ints, qf_base)
-    #         res = a+a+a+a-b
-    #         res = res*a*a
+        def multi_qfloats(qf_arrays, qf_signs, params):
+            qf_len, qf_ints, qf_base = params
+            a,b = qfloat_arrays_to_qfloat_list(qf_arrays, qf_signs, qf_ints, qf_base)
+            res = a+a+a-b
+            res = res*a
             
-    #         return qfloat_list_to_qfloat_arrays([res], qf_len, qf_ints, qf_base)
+            return qfloat_list_to_qfloat_arrays([res], qf_len, qf_ints, qf_base)
 
-    #     for i in range(10):
-    #         #base = np.random.randint(2,10)
-    #         base = 2
-    #         size = np.random.randint(20,30)
-    #         ints = np.random.randint(12, 16)
-    #         f1 = np.random.uniform(0,100,1)[0]
-    #         f2 = np.random.uniform(0,100,1)[0]
+        for i in range(1):
+            base = np.random.randint(2,10)
+            size = np.random.randint(20,30)
+            ints = size//2#np.random.randint(12, 16)
+            f1 = np.random.uniform(0,100,1)[0]
+            f2 = np.random.uniform(0,100,1)[0]
 
-    #         QFloat.KEEP_TIDY=False
-    #         circuit = QFloatCircuit(2, multi_qfloats, size, ints, base)
-    #         multi = circuit.run(np.array([f1,f2]), False)[0]
-    #         QFloat.KEEP_TIDY=True
-    #         #assert(division  - (f1/f2) < 0.01)  
+            circuit = QFloatCircuit(2, multi_qfloats, size, ints, base)
+            multi = circuit.run(np.array([f1,f2]), False)[0]
 
 
-unittest.main()
 
-# suite = unittest.TestLoader().loadTestsFromName('test_QFloat.TestQFloat.test_multi_fhe')
-# unittest.TextTestRunner(verbosity=1).run(suite)
+#unittest.main()
+
+suite = unittest.TestLoader().loadTestsFromName('test_QFloat_FHE.TestQFloat.test_multi_fhe')
+unittest.TextTestRunner(verbosity=1).run(suite)
