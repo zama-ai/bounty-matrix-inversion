@@ -646,7 +646,7 @@ def test_qf_inverse_python(sampler, params):
 #                                           FHE
 ########################################################################################
 
-def compile_circuit(params, sampler, circuit_function=qf_matrix_inverse):
+def compile_circuit(params, sampler, circuit_function):
 
     [n, qf_len, qf_ints, qf_base, _, _] = params
 
@@ -770,7 +770,7 @@ def test_qf_inverse_fhe(circuit, sampler, params):
 if __name__ == '__main__':
 
     n=2; qf_len = 12; qf_ints = 9; qf_base = 2; qf_len_out=14; qf_ints_out = 0;
-    #n=3; qf_len = 12; qf_ints = 9; qf_base = 2; qf_len_out=20; qf_ints_out = 8;
+    #n=2; qf_len = 12; qf_ints = 9; qf_base = 2; qf_len_out=20; qf_ints_out = 8;
 
     normal_sampler = ("Normal", lambda: np.random.randn(n, n) * 100)
     uniform_sampler = ("Uniform", lambda: np.random.uniform(0, 100, (n, n)))
@@ -785,9 +785,9 @@ if __name__ == '__main__':
 
     # test inverse qf python
     # ----------------------
-    QFloat.resetStats()
-    test_qf_inverse_python(sampler, params)
-    QFloat.showStats()
+    # QFloat.resetStats()
+    # test_qf_inverse_python(sampler, params)
+    # QFloat.showStats()
 
     # test pivot in fhe:
     # ------------------
@@ -813,7 +813,7 @@ if __name__ == '__main__':
     # test inversion in fhe:
     # -----------------------------
     QFloat.resetStats()
-    circuit = compile_circuit(params, sampler)
+    circuit = compile_circuit(params, sampler, circuit_function=qf_matrix_inverse)
     QFloat.showStats()
     test_qf_inverse_fhe(circuit, sampler, params)
 
