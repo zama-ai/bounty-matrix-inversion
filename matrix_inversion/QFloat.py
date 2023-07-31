@@ -25,12 +25,14 @@ def int_to_base_p(integer, n, p):
     Convert a base-p array to a float of the form 0.xxx..
     Can be signed (+/- values)
     """    
+    if n==0:
+        return np.array([])
     # Convert the integer to a base p string
     base_p_string= np.base_repr(np.abs(integer), p)
     # Prepend zeros to the binary representation until it reaches the desired size
     base_p_string = base_p_string.zfill(n)
     if len(base_p_string) > n:
-        raise Exception(f"integer: {integer} cannot be rerpresented with {n} values in base {p}")
+        raise Exception(f"integer: {integer} cannot be represented with {n} values in base {p}")
     # Convert the base_p string to a NumPy array of integers
     base_p_array = np.sign(integer)*np.array([int(digit) for digit in base_p_string])
     return base_p_array
@@ -231,6 +233,9 @@ class Zero():
 
     def __rtruediv__(self, other):
         raise Exception('division by Zero')
+
+    def __neg__(self):
+        return self
 
 #=======================================================================================================================
 #                                                       SignedBinary
@@ -1113,4 +1118,4 @@ class QFloat():
         newsign=signa*signb
         invert_div = QFloat(newsign*div_array, newints, self._base, True, newsign)
 
-        return invert_div            
+        return invert_div

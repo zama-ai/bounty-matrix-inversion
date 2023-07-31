@@ -22,10 +22,10 @@ class EncryptedMatrixInversion:
         self.qf_base = 2; # QFloats base (2=binary)
         self.qf_len_out=20; # output QFloats length
         self.qf_ints_out = 8; # output QFloats integer part length
-        
+
         params = [n, self.qf_len, self.qf_ints, self.qf_base, self.qf_len_out, self.qf_ints_out]
 
-        inputset = [sampler() for _ in range(100)]
+        inputset = [sampler() for _ in range(1000)]
         for sample in inputset:
             assert isinstance(sample, np.ndarray)
             assert np.issubdtype(sample.dtype, np.floating)
@@ -55,14 +55,18 @@ class EncryptedMatrixInversion:
     def dequantize(self, quantized_inverted_matrix: np.ndarray) -> np.ndarray:
         return qfloat_arrays_to_float_matrix(quantized_inverted_matrix, self.qf_ints_out, self.qf_base)
 
-    def run(self, matrix: np.ndarray) -> np.ndarray:
+    def run(self, matrix: np.ndarray, simulate=False) -> np.ndarray:
         assert np.issubdtype(matrix.dtype, np.floating)
         assert matrix.shape == self.shape
 
         quantized_matrix, qfloats_signs = self.quantize(matrix)
-        encrypted_quantized_matrix = self.encrypt(quantized_matrix, qfloats_signs)
-        encrypted_quantized_inverted_matrix = self.evaluate(encrypted_quantized_matrix)
-        quantized_inverted_matrix = self.decrypt(encrypted_quantized_inverted_matrix)
+        if not simulate:    
+            encrypted_quantized_matrix = self.encrypt(quantized_matrix, qfloats_signs)
+            encrypted_quantized_inverted_matrix = self.evaluate(encrypted_quantized_matrix)
+            quantized_inverted_matrix = self.decrypt(encrypted_quantized_inverted_matrix)
+        else:
+            quantized_inverted_matrix = self.circuit.simulate(quantized_matrix, qfloats_signs)
+
         inverted_matrix = self.dequantize(quantized_inverted_matrix)
 
         assert np.issubdtype(inverted_matrix.dtype, np.floating)

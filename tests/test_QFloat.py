@@ -113,6 +113,14 @@ class TestQFloat(unittest.TestCase):
             qf1 *= qf2
             assert( qf1.toFloat()-(f1*f2) < 0.1 ) # imul
 
+            # from mul with specific values
+            f1 = (np.random.randint(1,100)/1.0) # float of type (+/-)xx.
+            f2 = (np.random.randint(1,10000))/10000000 # float of type (+/-)0.000xxx
+            qf1 = QFloat.fromFloat(f1, 18, 18, 2)
+            qf2 = QFloat.fromFloat(f2, 25, 0, 2)
+            # from mul
+            assert( QFloat.fromMul(qf1, qf2, 18, 1).toFloat()-(f1*f2) < 0.1 )            
+
 
     def test_div_np(self):
         # test division
@@ -175,7 +183,7 @@ class TestQFloat(unittest.TestCase):
 
 
 
-unittest.main()
+#unittest.main()
 
-# suite = unittest.TestLoader().loadTestsFromName('test_QFloat.TestQFloat.test_multi_fhe')
-# unittest.TextTestRunner(verbosity=1).run(suite)
+suite = unittest.TestLoader().loadTestsFromName('test_QFloat.TestQFloat.test_mul_np')
+unittest.TextTestRunner(verbosity=1).run(suite)

@@ -165,8 +165,8 @@ class TestQFloat(unittest.TestCase):
         def add_qfloats(qf_arrays, qf_signs, params):
             qf_len, qf_ints, qf_base = params
             a,b = qfloat_arrays_to_qfloat_list(qf_arrays, qf_signs, qf_ints, qf_base)
-            res = [a+b]
-            return qfloat_list_to_qfloat_arrays(res, qf_len, qf_ints, qf_base)
+            res = a+b
+            return qfloat_list_to_qfloat_arrays([res], qf_len, qf_ints, qf_base)
 
         for i in range(10):
             base = np.random.randint(2,10)
@@ -187,8 +187,8 @@ class TestQFloat(unittest.TestCase):
         def mul_qfloats(qf_arrays, qf_signs, params):
             qf_len, qf_ints, qf_base = params
             a,b = qfloat_arrays_to_qfloat_list(qf_arrays, qf_signs, qf_ints, qf_base)
-            res = [a*b]
-            return qfloat_list_to_qfloat_arrays(res, qf_len, qf_ints, qf_base)
+            res = a*b
+            return qfloat_list_to_qfloat_arrays([res], qf_len, qf_ints, qf_base)
 
         for i in range(1):
             base = np.random.randint(2,10)
@@ -201,6 +201,53 @@ class TestQFloat(unittest.TestCase):
             multiplication = circuit.run(np.array([f1,f2]), False)[0]
             assert(multiplication  - (f1*f2) < 0.01)
 
+
+    def test_from_mul_fhe(self):
+        # test add and sub
+        print('test_from_mul_fhe')
+
+        def from_mul_qfloats(qf_arrays, qf_signs, params):
+            qf_len, qf_ints, qf_base = params
+            a,b = qfloat_arrays_to_qfloat_list(qf_arrays, qf_signs, qf_ints, qf_base)
+            a.set_len_ints(18,18)
+            b.set_len_ints(25,0)
+            res = QFloat.fromMul(a,b, 14, 0)
+            res.set_len_ints(18+25,18)
+            return qfloat_list_to_qfloat_arrays([res], qf_len, qf_ints, qf_base)
+            
+        # from mul with specific values
+        f1 = (np.random.randint(1,100)/1.0) # float of type (+/-)xx.
+        f2 = (np.random.randint(1,10000))/10000000 # float of type (+/-)0.000xxx
+        qf1 = QFloat.fromFloat(f1, 18, 18, 2)
+        qf2 = QFloat.fromFloat(f2, 25, 0, 2)
+        # from mul
+        circuit = QFloatCircuit(2, from_mul_qfloats, 18+25, 18, 2)
+        multiplication = circuit.run(np.array([f1,f2]), False)[0]
+        print(multiplication)
+        print(f1*f2, f1, f2)
+        assert(multiplication  - (f1*f2) < 0.01)
+
+    def test_neg_fhe(self):
+        # test add and sub
+        print('test_neg_fhe')
+
+        def neg_qfloats(qf_arrays, qf_signs, params):
+            qf_len, qf_ints, qf_base = params
+            a,b = qfloat_arrays_to_qfloat_list(qf_arrays, qf_signs, qf_ints, qf_base)
+            res=-a
+            return qfloat_list_to_qfloat_arrays([res], qf_len, qf_ints, qf_base)
+            
+        for i in range(10):
+            base = np.random.randint(2,10)
+            size = np.random.randint(20,30)
+            ints = size//2#np.random.randint(12, 16)
+            f1 = np.random.uniform(0,100,1)[0]
+            f2 = np.random.uniform(0,100,1)[0]
+
+            circuit = QFloatCircuit(2, neg_qfloats, size, ints, base)
+            negativef1 = circuit.run(np.array([f1,f2]), False)[0]
+            assert(negativef1  - f1 < 0.01) 
+
     def test_div_fhe(self):
         # test add and sub
         print('test_div_fhe')
@@ -208,8 +255,8 @@ class TestQFloat(unittest.TestCase):
         def div_qfloats(qf_arrays, qf_signs, params):
             qf_len, qf_ints, qf_base = params
             a,b = qfloat_arrays_to_qfloat_list(qf_arrays, qf_signs, qf_ints, qf_base)
-            res = [a/b]
-            return qfloat_list_to_qfloat_arrays(res, qf_len, qf_ints, qf_base)
+            res = a/b
+            return qfloat_list_to_qfloat_arrays([res], qf_len, qf_ints, qf_base)
 
         for i in range(10):
             base = np.random.randint(2,10)
@@ -249,5 +296,5 @@ class TestQFloat(unittest.TestCase):
 
 #unittest.main()
 
-suite = unittest.TestLoader().loadTestsFromName('test_QFloat_FHE.TestQFloat.test_multi_fhe')
+suite = unittest.TestLoader().loadTestsFromName('test_QFloat_FHE.TestQFloat.test_neg_fhe')
 unittest.TextTestRunner(verbosity=1).run(suite)
