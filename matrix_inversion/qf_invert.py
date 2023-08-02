@@ -401,7 +401,7 @@ def qf_lu_inverse(P, L, U, qf_len_out, qf_ints_out):
 
 
 ########################################################################################
-#                            2x2 and 3x3 SHORCUT FORMULAS
+#                               2x2 SHORCUT FORMULA
 ################2#######################################################################
 
 def qf_inverse_2x2(qf_M, qf_len_out, qf_ints_out):
@@ -414,13 +414,22 @@ def qf_inverse_2x2(qf_M, qf_len_out, qf_ints_out):
 
     ad = QFloat.fromMul(a,d, 18, 18) # produces a 18 bits integer with no decimals
     bc = QFloat.fromMul(b,c, 18, 18) # produces a 18 bits integer with no decimals
+
     det = ad - bc # determinant of M in 17 bits
 
-    det_inv = det.invert(1, 20, 0) # computes invert with a lot of decimals but no integer part
-    det_inv_n = -det_inv   
+    det_inv = det.invert(1, 25, 0) # computes invert with a lot of decimals but no integer part
+
+    det_inv_n = -det_inv
 
     mul = lambda x,y: QFloat.fromMul(x, y, qf_len_out, qf_ints_out) # multiply to output format
-    M_inv = [[mul(d, det_inv), mul(b, det_inv_n)], [mul(c, det_inv_n), mul(a, det_inv)]]
+    # OK # M_inv = [[det_inv, det_inv_n], [det_inv, det_inv_n]]
+    dd=mul(d, det_inv)
+    det.set_len_ints(qf_len_out, qf_ints_out)
+    d.set_len_ints(qf_len_out, qf_ints_out)
+    M_inv = [[det, det_inv], [dd, dd]]
+    # M_inv = [[det_inv, det_inv_n], [mul(d, det_inv), mul(d, det_inv_n)]]
+    # #M_inv = [[mul(d, det_inv), mul(b, det_inv_n)], [mul(c, det_inv_n), mul(a, det_inv)]]
+    # M_inv = [[mul(d, det_inv), mul(d, det_inv_n)], [mul(a, det_inv_n), mul(a, det_inv)]]
 
     return M_inv
 
@@ -609,6 +618,18 @@ def test_qf_PLU_python(sampler, params):
     print(' ') 
 
 
+
+def run_qf_inverse_python(M, qf_len, qf_ints, qf_base, qf_ints_out):
+    # convert it to QFloat arrays
+    qf_arrays, qf_signs = float_matrix_to_qfloat_arrays(M, qf_len, qf_ints, qf_base)
+
+    output = qf_matrix_inverse(qf_arrays, qf_signs, params)
+
+    qf_Res = qfloat_arrays_to_float_matrix(output, qf_ints_out, qf_base)
+
+    return qf_Res
+
+
 def test_qf_inverse_python(sampler, params):
     """
     Test the matrix inverse using QFloats, in python
@@ -622,10 +643,8 @@ def test_qf_inverse_python(sampler, params):
     qf_arrays, qf_signs = float_matrix_to_qfloat_arrays(M, qf_len, qf_ints, qf_base)
 
     start = time.time()
-    output = qf_matrix_inverse(qf_arrays, qf_signs, params)
+    qf_Res = run_qf_inverse_python(M, qf_len, qf_ints, qf_base, qf_ints_out)
     end = time.time()
-
-    qf_Res = qfloat_arrays_to_float_matrix(output, qf_ints_out, qf_base)
 
     print('\n==== Test python ====')
     print('\nQFloat inverse :')
@@ -663,7 +682,8 @@ def compile_circuit(params, sampler, circuit_function):
             enable_unsafe_features=True,
             use_insecure_key_cache=True,
             insecure_key_cache_location=".keys",
-            #dataflow_parallelize=True,
+            single_precision=False,
+            dataflow_parallelize=True,
         ),
         verbose=False,
     )
@@ -685,6 +705,7 @@ def run_qf_circuit_fhe(circuit, M, qf_len, qf_ints, qf_base, qf_ints_out, simula
         decrypted = measure_time(circuit.simulate,'Simulating', qf_arrays, qf_signs)
 
     if not raw_output:
+        print(decrypted)
         qf_Res = qfloat_arrays_to_float_matrix(decrypted, qf_ints_out, qf_base)
     else:
         qf_Res = decrypted
@@ -743,33 +764,34 @@ def test_qf_LU_L_fhe(circuit, sampler, params, simulate=False):
 
 
 def test_qf_inverse_fhe(circuit, sampler, params):
-    M = sampler()
+    #M = sampler()
+    M=np.array([[1,2],[3,4]])
 
     [n, qf_len, qf_ints, qf_base, qf_len_out, qf_ints_out] = params
     qf_Res_sim = run_qf_circuit_fhe(circuit, M, qf_len, qf_ints, qf_base, qf_ints_out, True)
 
-    print('LU inveres :')
-    print(matrix_inverse(M))
-    print(' ') 
+    print('\nQFloat inverse (Python):')
+    print(run_qf_inverse_python(M, qf_len, qf_ints, qf_base, qf_ints_out))
 
-    print('Scipy inv :')    
+    print('\nScipy inv :')    
     print(sc.linalg.inv(M)) 
-    print(' ')   
 
-    print('QFloat inverse (simulating):')
+    print('\nQFloat inverse (simulating):')
     print(qf_Res_sim)
     print(' ')
 
-    qf_Res = run_qf_circuit_fhe(circuit, M, qf_len, qf_ints, qf_base, qf_ints_out, False)
+    # qf_Res = run_qf_circuit_fhe(circuit, M, qf_len, qf_ints, qf_base, qf_ints_out, False)
 
-    print('QFloat inverse :')
-    print(qf_Res)
-    print(' ')
+    # print('\nQFloat inverse :')
+    # print(qf_Res)
+    # print(' ')
 
 
 if __name__ == '__main__':
 
-    n=2; qf_len = 12; qf_ints = 9; qf_base = 2; qf_len_out=14; qf_ints_out = 0;
+    #n=2; qf_len = 12; qf_ints = 9; qf_base = 2; qf_len_out=14; qf_ints_out = 0;
+    n=2; qf_len = 12; qf_ints = 9; qf_base = 2; qf_len_out=25; qf_ints_out = 10;
+    #n=2; qf_len = 14; qf_ints = 14; qf_base = 2; qf_len_out=20; qf_ints_out = 0;
     #n=2; qf_len = 12; qf_ints = 9; qf_base = 2; qf_len_out=20; qf_ints_out = 8;
 
     normal_sampler = ("Normal", lambda: np.random.randn(n, n) * 100)
