@@ -452,7 +452,7 @@ def qf_pivot(qf_arrays, qf_signs, params):
     # reconstruct the matrix of QFloats with encrypted values:
     qf_M = qfloat_arrays_to_QFloat_matrix(qf_arrays, qf_signs, qf_ints, qf_base)
 
-    # compute the LU decomposition
+    # compute the pivot matrix
     P = qf_pivot_matrix(qf_M)
 
     return P
@@ -706,18 +706,16 @@ def run_qf_circuit_fhe(circuit, M, qf_len, qf_ints, qf_base, qf_ints_out, simula
     else:
         decrypted = measure_time(circuit.simulate,'Simulating', qf_arrays, qf_signs)
 
-    if not raw_output:
-        qf_Res = qfloatNsigns_arrays_to_float_matrix(decrypted, qf_ints_out, qf_base)
-    else:
-        qf_Res = decrypted
+    if raw_output:
+        return decrypted
+    
+    return qfloatNsigns_arrays_to_float_matrix(decrypted, qf_ints_out, qf_base)
 
-    return qf_Res
 
 def test_qf_pivot_fhe(circuit, sampler, params, simulate=False):
     M = sampler()
     [n, qf_len, qf_ints, qf_base, qf_len_out, qf_ints_out] = params
-    qf_Res = run_qf_circuit_fhe(circuit, M, qf_len, qf_ints, qf_base, simulate, True)
-    
+    qf_Res = run_qf_circuit_fhe(circuit, M, qf_len, qf_ints, qf_base, qf_ints_out, simulate, True)
     if(simulate):
         print('SIMULATING')
 
@@ -768,13 +766,14 @@ def test_qf_inverse_fhe(circuit, sampler, params):
     M = sampler()
 
     [n, qf_len, qf_ints, qf_base, qf_len_out, qf_ints_out] = params
-    qf_Res_sim = run_qf_circuit_fhe(circuit, M, qf_len, qf_ints, qf_base, qf_ints_out, True)
+
+    print('\nScipy inv :')    
+    print(sc.linalg.inv(M)) 
 
     print('\nQFloat inverse (Python):')
     print(run_qf_inverse_python(M, qf_len, qf_ints, qf_base, qf_ints_out))
 
-    print('\nScipy inv :')    
-    print(sc.linalg.inv(M)) 
+    qf_Res_sim = run_qf_circuit_fhe(circuit, M, qf_len, qf_ints, qf_base, qf_ints_out, True)
 
     print('\nQFloat inverse (simulating):')
     print(qf_Res_sim)
@@ -811,10 +810,10 @@ if __name__ == '__main__':
 
     # test pivot in fhe:
     # ------------------
-    QFloat.resetStats()
-    circuit = compile_circuit(params, sampler, qf_pivot)
-    QFloat.showStats()
-    test_qf_pivot_fhe(circuit, sampler, params, False)
+    # QFloat.resetStats()
+    # circuit = compile_circuit(params, sampler, qf_pivot)
+    # QFloat.showStats()
+    # test_qf_pivot_fhe(circuit, sampler, params, False)
 
     # test LU U decomposition in fhe:
     # -----------------------------
@@ -832,8 +831,8 @@ if __name__ == '__main__':
 
     # test inversion in fhe:
     # -----------------------------
-    # QFloat.resetStats()
-    # circuit = compile_circuit(params, sampler, qf_matrix_inverse)
-    # QFloat.showStats()
-    # test_qf_inverse_fhe(circuit, sampler, params)
+    QFloat.resetStats()
+    circuit = compile_circuit(params, sampler, qf_matrix_inverse)
+    QFloat.showStats()
+    test_qf_inverse_fhe(circuit, sampler, params)
 

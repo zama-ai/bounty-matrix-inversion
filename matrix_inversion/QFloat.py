@@ -528,9 +528,7 @@ class QFloat():
         """
         Create a QFloat copy
         """
-        copy = QFloat(self.toArray(), self._ints, self._base, self._isBaseTidy, self._sign)
-        copy._isBaseTidy = self._isBaseTidy
-        return copy       
+        return QFloat(self.toArray(), self._ints, self._base, self._isBaseTidy, self._sign)
 
     def toArray(self):
         """
@@ -696,7 +694,7 @@ class QFloat():
         Returns the absolute value
         """
         absval = self.copy()
-        absval._sign = 1
+        absval._sign = fhe.ones(1)[0]
         return absval
 
     def __add__(self, other):
@@ -705,29 +703,8 @@ class QFloat():
         Summing will potentially make values in the sum array be greater than the base and not tidy, so isTidy becomes False
         Hence we need to tidy the sum if requested
         """
-        QFloat.ADDITIONS+=1 # count addition in all cases, cause we have to tidy
-
-        if isinstance(other, Tracer) or isinstance(other, numbers.Integral):
-            # Add a single integer
-            addition = self.copy()
-            # multiply array by sign first
-            addition._array *= addition._sign
-            addition._array[self._ints-1]+=other
-        elif isinstance(other, SignedBinary):
-            addition = self.copy()
-            # multiply array by sign first
-            addition._array *= addition._sign
-            addition._array[self._ints-1]+=other.value
-        else:
-            self.checkCompatibility(other)
-            addition = QFloat(self._array*self._sign + other._array*other._sign, self._ints, self._base, False, None) # sign is None untill we figure it out with tidy
-
-        addition._isBaseTidy = False
-        addition._sign=None
-
-        # tidy the qflloat to make the integers positive and know the sign
-        addition.tidy()
-
+        addition = self.copy()
+        addition += other
         return addition
 
     def __radd__(self, other):
@@ -757,6 +734,7 @@ class QFloat():
         Summing will potentially make values in the sum array be greater than the base and not tidy, so isTidy becomes False
         Hence we need to tidy if requested
         """
+        QFloat.ADDITIONS+=1 # count addition in all cases, cause we have to tidy
 
         # multiply array by sign first
         self._array *= self._sign
