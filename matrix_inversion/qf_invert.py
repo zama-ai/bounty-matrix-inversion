@@ -204,7 +204,7 @@ def float_matrix_to_qfloat_arrays(M, qf_len, qf_ints, qf_base):
 
 def qfloat_arrays_to_QFloat_matrix(qf_arrays, qf_signs, qf_ints, qf_base):
     """
-    converts qfloats arrays to a QFloat matrix
+    converts qfloats array and sign array to a QFloat matrix
     """
     n = int(np.sqrt(qf_arrays.shape[0]))
     qf_M = []
@@ -219,38 +219,41 @@ def qfloat_arrays_to_QFloat_matrix(qf_arrays, qf_signs, qf_ints, qf_base):
 
     return qf_M
 
-def qfloat_arrays_to_float_matrix(qf_arrays, qf_ints, qf_base):
+def qfloatNsigns_arrays_to_float_matrix(qf_arrays, qf_ints, qf_base):
     """
-    converts qfloats arrays to a float matrix
+    converts qfloats and signs arrays to a float matrix
     """
     n = int(np.sqrt(qf_arrays.shape[0]))
     M = np.zeros((n,n))
     index=0
     for i in range(n):
         for j in range(n):
-            M[i,j] = QFloat(qf_arrays[index,:], qf_ints, qf_base).toFloat()
+            M[i,j] = QFloat(qf_arrays[index,:-1], qf_ints, qf_base, True, qf_arrays[index,-1]).toFloat()
             index+=1
 
     return M    
 
-def qfloat_matrix_to_arrays(M, qf_len, qf_ints, qf_base):
+def qfloat_matrix_to_arraysNsigns(M, qf_len, qf_ints, qf_base):
     """
-    converts a QFloat 2D-list matrix to integer arrays 
+    converts a QFloat 2D-list matrix to integer arrays and signs
     """
     n=len(M)
     assert(n==len(M[0]))
-    qf_arrays = fhe.zeros((n*n, qf_len))
+    qf_arrays = fhe.zeros((n*n, qf_len+1)) # add one for the sign
     index=0
     for i in range(n):
         for j in range(n):
             if isinstance(M[i][j], QFloat):
-                qf_arrays[index,:] = M[i][j].toArray()
+                qf_arrays[index,:qf_len] = M[i][j].toArray()
+                qf_arrays[index,qf_len] = M[i][j].getSign()
             elif isinstance(M[i][j], SignedBinary):
                 qf_arrays[index,qf_ints-1] = M[i][j].value
+                qf_arrays[index,qf_len] = M[i][j].value
             elif isinstance(M[i][j], Zero):
-                qf_arrays[index,qf_ints-1] = 0
+                pass
             else:
                 qf_arrays[index,qf_ints-1] = M[i][j]
+                qf_arrays[index,qf_len] = np.sign(M[i][j])
             index += 1
 
     return qf_arrays
@@ -423,13 +426,12 @@ def qf_inverse_2x2(qf_M, qf_len_out, qf_ints_out):
 
     mul = lambda x,y: QFloat.fromMul(x, y, qf_len_out, qf_ints_out) # multiply to output format
     # OK # M_inv = [[det_inv, det_inv_n], [det_inv, det_inv_n]]
-    dd=mul(d, det_inv)
-    det.set_len_ints(qf_len_out, qf_ints_out)
-    d.set_len_ints(qf_len_out, qf_ints_out)
-    M_inv = [[det, det_inv], [dd, dd]]
+    # dd=mul(d, det_inv)
+    # det.set_len_ints(qf_len_out, qf_ints_out)
+    # d.set_len_ints(qf_len_out, qf_ints_out)
+    # M_inv = [[det, det_inv], [dd, dd]]
     # M_inv = [[det_inv, det_inv_n], [mul(d, det_inv), mul(d, det_inv_n)]]
-    # #M_inv = [[mul(d, det_inv), mul(b, det_inv_n)], [mul(c, det_inv_n), mul(a, det_inv)]]
-    # M_inv = [[mul(d, det_inv), mul(d, det_inv_n)], [mul(a, det_inv_n), mul(a, det_inv)]]
+    M_inv = [[mul(d, det_inv), mul(b, det_inv_n)], [mul(c, det_inv_n), mul(a, det_inv)]]
 
     return M_inv
 
@@ -472,8 +474,8 @@ def qf_lu_L(qf_arrays, qf_signs, params):
     bin_P, qf_L, qf_U = qf_lu_decomposition(qf_M)    
 
     # break the resulting QFloats into arrays:
-    qf_inv_arrays_L = qfloat_matrix_to_arrays(qf_L, qf_len, qf_ints, qf_base)    
-    #qf_inv_arrays_U = qfloat_matrix_to_arrays(qf_U, qf_len, qf_ints, qf_base)    
+    qf_inv_arrays_L = qfloat_matrix_to_arraysNsigns(qf_L, qf_len, qf_ints, qf_base)    
+    #qf_inv_arrays_U = qfloat_matrix_to_arraysNsigns(qf_U, qf_len, qf_ints, qf_base)    
 
     return qf_inv_arrays_L
 
@@ -494,8 +496,8 @@ def qf_lu_U(qf_arrays, qf_signs, params):
     bin_P, qf_L, qf_U = qf_lu_decomposition(qf_M)    
 
     # break the resulting QFloats into arrays:
-    #qf_inv_arrays_L = qfloat_matrix_to_arrays(qf_L, qf_len, qf_ints, qf_base)    
-    qf_inv_arrays_U = qfloat_matrix_to_arrays(qf_U, qf_len, qf_ints, qf_base)    
+    #qf_inv_arrays_L = qfloat_matrix_to_arraysNsigns(qf_L, qf_len, qf_ints, qf_base)    
+    qf_inv_arrays_U = qfloat_matrix_to_arraysNsigns(qf_U, qf_len, qf_ints, qf_base)    
 
     return qf_inv_arrays_U
 
@@ -525,7 +527,7 @@ def qf_matrix_inverse(qf_arrays, qf_signs, params):
         qf_Minv = qf_lu_inverse(bin_P, qf_L, qf_U, qf_len_out, qf_ints_out)
 
     # break the resulting QFloats into arrays:
-    qf_inv_arrays = qfloat_matrix_to_arrays(qf_Minv, qf_len_out, qf_ints_out, qf_base)
+    qf_inv_arrays = qfloat_matrix_to_arraysNsigns(qf_Minv, qf_len_out, qf_ints_out, qf_base)
 
     return qf_inv_arrays
 
@@ -583,11 +585,11 @@ def test_qf_PLU_python(sampler, params):
     P = np.array( map_2D_list(bin_P, lambda x: x.value) )
 
     # break the resulting QFloats into arrays:
-    qf_arrays_L = qfloat_matrix_to_arrays(qf_L, qf_len_out, qf_ints_out, qf_base)
-    qf_arrays_U = qfloat_matrix_to_arrays(qf_U, qf_len_out, qf_ints_out, qf_base)
+    qf_arrays_L = qfloat_matrix_to_arraysNsigns(qf_L, qf_len_out, qf_ints_out, qf_base)
+    qf_arrays_U = qfloat_matrix_to_arraysNsigns(qf_U, qf_len_out, qf_ints_out, qf_base)
 
-    L = qfloat_arrays_to_float_matrix(qf_arrays_L, qf_ints_out, qf_base)
-    U = qfloat_arrays_to_float_matrix(qf_arrays_U, qf_ints_out, qf_base)
+    L = qfloatNsigns_arrays_to_float_matrix(qf_arrays_L, qf_ints_out, qf_base)
+    U = qfloatNsigns_arrays_to_float_matrix(qf_arrays_U, qf_ints_out, qf_base)
 
     print(' PIVOT MATRIX\n============')
     print('QFloat P :')
@@ -625,7 +627,7 @@ def run_qf_inverse_python(M, qf_len, qf_ints, qf_base, qf_ints_out):
 
     output = qf_matrix_inverse(qf_arrays, qf_signs, params)
 
-    qf_Res = qfloat_arrays_to_float_matrix(output, qf_ints_out, qf_base)
+    qf_Res = qfloatNsigns_arrays_to_float_matrix(output, qf_ints_out, qf_base)
 
     return qf_Res
 
@@ -683,7 +685,7 @@ def compile_circuit(params, sampler, circuit_function):
             use_insecure_key_cache=True,
             insecure_key_cache_location=".keys",
             single_precision=False,
-            dataflow_parallelize=True,
+            #dataflow_parallelize=True,
         ),
         verbose=False,
     )
@@ -705,8 +707,7 @@ def run_qf_circuit_fhe(circuit, M, qf_len, qf_ints, qf_base, qf_ints_out, simula
         decrypted = measure_time(circuit.simulate,'Simulating', qf_arrays, qf_signs)
 
     if not raw_output:
-        print(decrypted)
-        qf_Res = qfloat_arrays_to_float_matrix(decrypted, qf_ints_out, qf_base)
+        qf_Res = qfloatNsigns_arrays_to_float_matrix(decrypted, qf_ints_out, qf_base)
     else:
         qf_Res = decrypted
 
@@ -764,8 +765,7 @@ def test_qf_LU_L_fhe(circuit, sampler, params, simulate=False):
 
 
 def test_qf_inverse_fhe(circuit, sampler, params):
-    #M = sampler()
-    M=np.array([[1,2],[3,4]])
+    M = sampler()
 
     [n, qf_len, qf_ints, qf_base, qf_len_out, qf_ints_out] = params
     qf_Res_sim = run_qf_circuit_fhe(circuit, M, qf_len, qf_ints, qf_base, qf_ints_out, True)
@@ -780,17 +780,17 @@ def test_qf_inverse_fhe(circuit, sampler, params):
     print(qf_Res_sim)
     print(' ')
 
-    # qf_Res = run_qf_circuit_fhe(circuit, M, qf_len, qf_ints, qf_base, qf_ints_out, False)
+    qf_Res = run_qf_circuit_fhe(circuit, M, qf_len, qf_ints, qf_base, qf_ints_out, False)
 
-    # print('\nQFloat inverse :')
-    # print(qf_Res)
-    # print(' ')
+    print('\nQFloat inverse :')
+    print(qf_Res)
+    print(' ')
 
 
 if __name__ == '__main__':
 
-    #n=2; qf_len = 12; qf_ints = 9; qf_base = 2; qf_len_out=14; qf_ints_out = 0;
-    n=2; qf_len = 12; qf_ints = 9; qf_base = 2; qf_len_out=25; qf_ints_out = 10;
+    n=2; qf_len = 12; qf_ints = 9; qf_base = 2; qf_len_out=14; qf_ints_out = 0;
+    #n=2; qf_len = 12; qf_ints = 9; qf_base = 2; qf_len_out=25; qf_ints_out = 10;
     #n=2; qf_len = 14; qf_ints = 14; qf_base = 2; qf_len_out=20; qf_ints_out = 0;
     #n=2; qf_len = 12; qf_ints = 9; qf_base = 2; qf_len_out=20; qf_ints_out = 8;
 
