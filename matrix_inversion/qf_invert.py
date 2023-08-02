@@ -780,19 +780,17 @@ def test_qf_inverse_fhe(circuit, sampler, params):
     print(qf_Res_sim)
     print(' ')
 
-    qf_Res = run_qf_circuit_fhe(circuit, M, qf_len, qf_ints, qf_base, qf_ints_out, False)
+    # qf_Res = run_qf_circuit_fhe(circuit, M, qf_len, qf_ints, qf_base, qf_ints_out, False)
 
-    print('\nQFloat inverse :')
-    print(qf_Res)
-    print(' ')
+    # print('\nQFloat inverse :')
+    # print(qf_Res)
+    # print(' ')
 
 
 if __name__ == '__main__':
 
-    n=2; qf_len = 12; qf_ints = 9; qf_base = 2; qf_len_out=14; qf_ints_out = 0;
-    #n=2; qf_len = 12; qf_ints = 9; qf_base = 2; qf_len_out=25; qf_ints_out = 10;
-    #n=2; qf_len = 14; qf_ints = 14; qf_base = 2; qf_len_out=20; qf_ints_out = 0;
-    #n=2; qf_len = 12; qf_ints = 9; qf_base = 2; qf_len_out=20; qf_ints_out = 8;
+    #n=2; qf_len = 12; qf_ints = 9; qf_base = 2; qf_len_out=14; qf_ints_out = 0;
+    n=3; qf_len = 12; qf_ints = 9; qf_base = 2; qf_len_out=20; qf_ints_out = 8;
 
     normal_sampler = ("Normal", lambda: np.random.randn(n, n) * 100)
     uniform_sampler = ("Uniform", lambda: np.random.uniform(0, 100, (n, n)))
@@ -813,29 +811,29 @@ if __name__ == '__main__':
 
     # test pivot in fhe:
     # ------------------
-    #QFloat.resetStats()
-    # circuit = compile_circuit(n, qf_len, qf_ints, qf_base, sampler, circuit_function=qf_pivot)
-    #QFloat.showStats()
-    # test_qf_pivot_fhe(circuit, sampler, qf_len, qf_ints, qf_base, simulate=False)
+    QFloat.resetStats()
+    circuit = compile_circuit(params, sampler, qf_pivot)
+    QFloat.showStats()
+    test_qf_pivot_fhe(circuit, sampler, params, False)
 
     # test LU U decomposition in fhe:
     # -----------------------------
     # QFloat.resetStats()
-    # circuit = compile_circuit(n, qf_len, qf_ints, qf_base, sampler, circuit_function=qf_lu_U)
+    # circuit = compile_circuit(params, sampler, qf_lu_U)
     # QFloat.showStats()
-    # test_qf_LU_U_fhe(circuit, sampler, qf_len, qf_ints, qf_base, simulate=False)
+    # test_qf_LU_U_fhe(circuit, sampler, params, False)
 
     # test LU L decomposition in fhe:
     # -----------------------------
     # QFloat.resetStats()
-    # circuit = compile_circuit(params, sampler, circuit_function=qf_lu_L)
+    # circuit = compile_circuit(params, sampler, qf_lu_L)
     # QFloat.showStats()
     # test_qf_LU_L_fhe(circuit, params, simulate=True)    
 
     # test inversion in fhe:
     # -----------------------------
-    QFloat.resetStats()
-    circuit = compile_circuit(params, sampler, circuit_function=qf_matrix_inverse)
-    QFloat.showStats()
-    test_qf_inverse_fhe(circuit, sampler, params)
+    # QFloat.resetStats()
+    # circuit = compile_circuit(params, sampler, qf_matrix_inverse)
+    # QFloat.showStats()
+    # test_qf_inverse_fhe(circuit, sampler, params)
 

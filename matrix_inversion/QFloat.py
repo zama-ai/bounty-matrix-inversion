@@ -341,7 +341,6 @@ class QFloat():
 
     # Statistics for counting operations between QFloats within a circuit
     ADDITIONS=0
-    SUBTRACTION=0
     MULTIPLICATION=0
     DIVISION=0
 
@@ -386,7 +385,6 @@ class QFloat():
 
     def resetStats():
         QFloat.ADDITIONS=0
-        QFloat.SUBTRACTION=0
         QFloat.MULTIPLICATION=0
         QFloat.DIVISION=0
 
@@ -394,7 +392,6 @@ class QFloat():
         print('\nQFloat statistics :')
         print('======================')
         print('Additions       : ' +  str(QFloat.ADDITIONS))
-        print('Subtractions    : ' +  str(QFloat.SUBTRACTION))
         print('Multiplications : ' +  str(QFloat.MULTIPLICATION))
         print('Divisions       : ' +  str(QFloat.DIVISION))
         print('\n')
@@ -708,6 +705,8 @@ class QFloat():
         Summing will potentially make values in the sum array be greater than the base and not tidy, so isTidy becomes False
         Hence we need to tidy the sum if requested
         """
+        QFloat.ADDITIONS+=1 # count addition in all cases, cause we have to tidy
+
         if isinstance(other, Tracer) or isinstance(other, numbers.Integral):
             # Add a single integer
             addition = self.copy()
@@ -720,7 +719,6 @@ class QFloat():
             addition._array *= addition._sign
             addition._array[self._ints-1]+=other.value
         else:
-            QFloat.ADDITIONS+=1 # count only addition with other Qfloat
             self.checkCompatibility(other)
             addition = QFloat(self._array*self._sign + other._array*other._sign, self._ints, self._base, False, None) # sign is None untill we figure it out with tidy
 
