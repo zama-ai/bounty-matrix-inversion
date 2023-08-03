@@ -254,6 +254,9 @@ class Zero():
     def __neg__(self):
         return self
 
+    def neg(self):
+        return self
+
 #=======================================================================================================================
 #                                                       SignedBinary
 #=======================================================================================================================
@@ -322,6 +325,10 @@ class SignedBinary():
 
     def __neg__(self):
         return SignedBinary(-1*self._value)
+
+    def neg(self):
+        self._value *= -1
+        return self
 
     def __abs__(self):
         return SignedBinary(np.abs(self._value))
@@ -702,8 +709,6 @@ class QFloat():
     def __add__(self, other):
         """
         Sum with another QFLoat or single integer
-        Summing will potentially make values in the sum array be greater than the base and not tidy, so isTidy becomes False
-        Hence we need to tidy the sum if requested
         """
         addition = self.copy()
         addition += other
@@ -733,10 +738,12 @@ class QFloat():
     def __iadd__(self, other):
         """
         Sum with another QFLoat or single integer, in place
-        Summing will potentially make values in the sum array be greater than the base and not tidy, so isTidy becomes False
-        Hence we need to tidy if requested
         """
-        QFloat.ADDITIONS+=1 # count addition in all cases, cause we have to tidy
+
+        if isinstance(other, Zero):
+            return # no change if adding a Zero
+        
+        QFloat.ADDITIONS+=1 # count addition in all other cases, cause we have to tidy
 
         # multiply array by sign first
         self._array *= self._sign
@@ -749,7 +756,6 @@ class QFloat():
             self.selfCheckConvertFHE(other._encrypted)
             self._array[self._ints-1]+=other.value        
         else:
-            QFloat.ADDITIONS+=1 # count only addition with other Qfloat
             self.selfCheckConvertFHE(other._encrypted)
 
             self.checkCompatibility(other)
@@ -766,8 +772,6 @@ class QFloat():
     def __sub__(self, other):
         """
         Subtract another QFLoat
-        Subtracting will potentially make values in the sum array be greater than the base and not tidy, so isTidy becomes False
-        Hence we need to tidy the subtraction if requested
         """
         return self + (-other)
 
@@ -780,8 +784,6 @@ class QFloat():
     def __imul__(self, other):
         """
         Multiply with another QFLoat or integer, in place
-        Multiplying will potentially make values in the sum array be greater than the base and not tidy, so isTidy becomes False
-        Hence we need to tidy if requested
 
         WARNING: precision of multiplication does not increase, so it may overflow if not enough
         """
@@ -864,6 +866,13 @@ class QFloat():
         neg=self.copy()
         neg._sign *= -1
         return neg
+
+    def neg(self):
+        """
+        In place negative
+        """    
+        self._sign *= -1
+        return self
 
     def fromMul(a, b, newlength=None, newints=None):
         """

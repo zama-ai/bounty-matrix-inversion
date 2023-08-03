@@ -166,13 +166,13 @@ def qf_list_dot_product(list1, list2):
     """
     if len(list1) != len(list2):
         raise ValueError("Lists should have the same length.")
-    
+
     result = list1[0] * list2[0]
     for i in range(1,len(list1)):
         result += (list1[i] * list2[i]) # in place addition is supported
     
-    return result
-
+    return result    
+    
 def qf_list_matrix_multiply(matrix1, matrix2):
     """
     Multiply two matrices of int or QFloats
@@ -351,7 +351,7 @@ def qf_lu_decomposition(M):
         for i in range(j+1):
             if i>0:
                 s1 = qf_list_dot_product([U[k][j] for k in range(0,i)], [ L[i][k] for k in range(0,i) ])
-                U[i][j] = PM[i][j] - s1
+                U[i][j] = PM[i][j] + s1.neg()
             else:
                 U[i][j] = PM[i][j].copy()
             U[i][j].set_len_ints(20, 8)
@@ -362,7 +362,7 @@ def qf_lu_decomposition(M):
             if j>0:
                 s2 = qf_list_dot_product([U[k][j] for k in range(0,j)], [L[i][k] for k in range(0,j)])
                 #L[i][j] = (PM[i][j] - s2) * inv_Ujj
-                L[i][j] = QFloat.fromMul((PM[i][j] - s2),inv_Ujj, 20, 8)
+                L[i][j] = QFloat.fromMul((PM[i][j] + s2.neg()),inv_Ujj, 20, 8)
             else:
                 #L[i][j] = PM[i][j] / U[j][j]
                 L[i][j] = QFloat.fromMul(PM[i][j], inv_Ujj, 20, 8)
@@ -652,7 +652,7 @@ def test_qf_inverse_python(sampler, params):
     print('\nQFloat inverse :')
     print(qf_Res)
 
-    print('\nLU inveres :')
+    print('\nLU inverse :')
     print(matrix_inverse(M)) 
 
     print('\nScipy inv :')    
