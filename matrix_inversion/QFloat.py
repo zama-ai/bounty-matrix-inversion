@@ -68,6 +68,26 @@ def float_to_base_p(f, precision, p):
         basep.append(0)
     return sgn*np.array(basep)
 
+def base_p_addition(a, b, p, inplace=False):
+    """
+    Add arrays in base p. (a and b must be tidy)
+    If a and b have different sizes, the longer array is considered to have extra zeros to the left
+    if inplace is True, the result is written is a
+    """
+    carry = 0
+    if inplace:
+        result = a
+    else:
+        result = fhe.zeros(a.size)
+
+    # Loop through both arrays and perform binary addition
+    for i in range(min(a.size, b.size)):
+        bit_sum = a[-i-1] + b[-i-1] + carry
+        result[-i-1] = bit_sum % 2
+        carry = bit_sum // 2
+
+    return result
+
 def base_p_subtraction_overflow(a, b, p):
     """
     Subtract arrays in base p. (a and b must be tidy)
