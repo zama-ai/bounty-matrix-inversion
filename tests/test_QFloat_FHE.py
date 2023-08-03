@@ -8,7 +8,8 @@ sys.path.append(os.getcwd())
 
 from matrix_inversion.QFloat import QFloat, SignedBinary
 
-QFloat.KEEP_TIDY=False
+
+BASE=2
 
 def print_red(text):
     # ANSI escape sequence for red color
@@ -76,16 +77,19 @@ def qfloat_list_to_qfloat_arrays(L, qf_len, qf_ints, qf_base):
     if not isinstance(L, list):
         raise TypeError('L must be list')
     n=len(L)
-    qf_arrays = fhe.zeros((n, qf_len))
+    qf_arrays = fhe.zeros((n, qf_len+1)) # +1 to store the sign
     for i in range(n):
         if isinstance(L[i], QFloat):
-            qf_arrays[i,:] = L[i].toArray()
+            qf_arrays[i,:-1] = L[i].toArray()
+            qf_arrays[i,-1] = L[i].getSign()
         elif isinstance(L[i], SignedBinary):
             qf_arrays[i,qf_ints-1] = L[i].value
+            qf_arrays[i,-1] = L[i].value
         elif isinstance(L[i], Zero):
-            qf_arrays[i,qf_ints-1] = 0
+            pass
         else:
             qf_arrays[i,qf_ints-1] = L[i]
+            qf_arrays[i,-1] = np.sign(L[i])
 
     return qf_arrays
 
@@ -96,7 +100,7 @@ def qfloat_arrays_to_float_array(qf_arrays, qf_ints, qf_base):
     n = int(qf_arrays.shape[0])
     arr=np.zeros(n)
     for i in range(n):
-        arr[i] = QFloat(qf_arrays[i,:], qf_ints, qf_base).toFloat()
+        arr[i] = QFloat(qf_arrays[i,:-1], qf_ints, qf_base, True, qf_arrays[i,-1]).toFloat()
 
     return arr
 
@@ -169,7 +173,7 @@ class TestQFloat(unittest.TestCase):
             return qfloat_list_to_qfloat_arrays([res], qf_len, qf_ints, qf_base)
 
         for i in range(10):
-            base = np.random.randint(2,10)
+            base = BASE or np.random.randint(2,10)
             size = np.random.randint(20,30)
             ints = np.random.randint(12, 16)
             f1 = np.random.uniform(0,100,1)[0]
@@ -191,7 +195,7 @@ class TestQFloat(unittest.TestCase):
             return qfloat_list_to_qfloat_arrays([res], qf_len, qf_ints, qf_base)
 
         for i in range(1):
-            base = np.random.randint(2,10)
+            base = BASE or np.random.randint(2,10)
             size = np.random.randint(20,30)
             ints = size//2#np.random.randint(12, 16)
             f1 = np.random.uniform(0,100,1)[0]
@@ -238,7 +242,7 @@ class TestQFloat(unittest.TestCase):
             return qfloat_list_to_qfloat_arrays([res], qf_len, qf_ints, qf_base)
             
         for i in range(10):
-            base = np.random.randint(2,10)
+            base = BASE or np.random.randint(2,10)
             size = np.random.randint(20,30)
             ints = size//2#np.random.randint(12, 16)
             f1 = np.random.uniform(0,100,1)[0]
@@ -259,7 +263,7 @@ class TestQFloat(unittest.TestCase):
             return qfloat_list_to_qfloat_arrays([res], qf_len, qf_ints, qf_base)
 
         for i in range(10):
-            base = np.random.randint(2,10)
+            base = BASE or np.random.randint(2,10)
             size = np.random.randint(20,30)
             ints = np.random.randint(12, 16)
             f1 = np.random.uniform(0,100,1)[0]
@@ -283,7 +287,7 @@ class TestQFloat(unittest.TestCase):
             return qfloat_list_to_qfloat_arrays([res], qf_len, qf_ints, qf_base)
 
         for i in range(1):
-            base = np.random.randint(2,10)
+            base = BASE or np.random.randint(2,10)
             size = np.random.randint(20,30)
             ints = size//2#np.random.randint(12, 16)
             f1 = np.random.uniform(0,100,1)[0]
@@ -296,5 +300,5 @@ class TestQFloat(unittest.TestCase):
 
 #unittest.main()
 
-suite = unittest.TestLoader().loadTestsFromName('test_QFloat_FHE.TestQFloat.test_neg_fhe')
+suite = unittest.TestLoader().loadTestsFromName('test_QFloat_FHE.TestQFloat.test_div_fhe')
 unittest.TextTestRunner(verbosity=1).run(suite)

@@ -155,10 +155,16 @@ def is_greater_or_equal(a, b):
         borrow = a[-i-1] - b[-i-1] - borrow < 0
     return 1-borrow  
 
+def is_equal(a, b):
+    """
+    Computes wether an array is equal to another
+    """
+    return (a.size - np.sum(a == b))==0
+
 def is_positive(a):
     """
     Fast computation of wether an array number a is positive (or zero)
-    a must be base tidy
+    a must be base tidy (returns the first non zero sign)
     """
     borrow = 0
     for i in range(a.size):
@@ -335,9 +341,6 @@ class QFloat():
     for very low numbers. For isntance: 0.000000001110 encoded as -.--------1110 with dot position = -8
     TODO: fast inversion algorithm using dichotomia search
     """
-
-    # keepTidy: wether to keep arrays tidy at all time. Setting to False can save time in FHE.
-    KEEP_TIDY=False
 
     # Statistics for counting operations between QFloats within a circuit
     ADDITIONS=0
@@ -639,47 +642,36 @@ class QFloat():
         if not (self._isBaseTidy and other._isBaseTidy):
             raise Exception('cannot compare QFloats that are not tidy')        
 
-        return (len(self) - np.sum(self._array == other._array))==0 & (self._sign==other._sign)
+        return is_equal(self._array, other._array) & (self._sign==other._sign)
 
     def __lt__(self, other):
         """ Computes wether an array is lower than another
 
-        An array A is lower than a array B if and only if:
-        there exist an index i such that: A[i] < B[i]  AND  for all k<i, A[k] <= B[k]
-
-        This is the mathematical converse of A >= B (see self.__ge__) which is easier to do in fhe
+        The proposition "A < B" is equivalent to " B > A " (see self.__gt__)
 
         If array have different length, the shorter one is considered to have extra -np.inf values
         """
-        return 1-(self >= other)
+        return other > self
 
     def __le__(self, other):
         """ Computes wether an array is lower or equal than another
 
-        The proposition "A <= B" is equivalent to "B >= A" (see self.__ge__)
+        The proposition "A <= B" is the converse of "A > B" (see self.__gt__)
 
         If array have different length, the shorter one is considered to have extra extra -np.inf values
         """       
-        return other >= self
+        return 1-(self > other)
 
     def __gt__(self, other):
         """ Computes wether an array is greater than another
 
-        The proposition "A > B" is the mathematical converse of "B >= A" (see self.__ge__)
+        An qfloat A is greater than a qfloat B if and only if:
+        - they have different signs and sign(A) > sign(B)
+        - or they have identical signs, are not equal, and (arr(A) > arr(B) and the signs are positive),
+            else (arr(A) < arr(B) and the signs are negative)
 
         If array have different length, the shorter one is considered to have extra extra -np.inf values
         """
-        return 1-(other >= self)
-
-    def __ge__(self, other):
-        """ Computes wether an array is greater or equal than another, in alphabetical order
-
-        An array A is greater or equal than an array B if and only if:
-        - either they have different signs and sign(A) >= sign(B)
-        - either they have identical signs, and if the sign is (+):
-            for all index i:  either  A[i] >= B[i]  or  there is an index k<i where A[k] > B[k]
-            the oppositve if the sign is (-)
-        """     
         self.checkCompatibility(other)
 
         self.baseTidy()
@@ -687,7 +679,17 @@ class QFloat():
 
         sgn_eq = self._sign == other._sign
 
-        return sgn_eq*is_greater_or_equal(self._array, other._array)*self._sign + (1-sgn_eq)*(self._sign > other._sign)
+        self_gt_other = 1-is_greater_or_equal(other._array, self._array) # not b>=a <=> not not a>b  <=> a>b 
+        inverse = (self._sign < 0) & (1-is_equal(self._array, other._array)) # inverse if negative sign but no equality
+
+        return sgn_eq*(self_gt_other ^ inverse) + (1-sgn_eq)*(self._sign > other._sign)
+
+    def __ge__(self, other):
+        """ Computes wether an array is greater or equal than another, in alphabetical order
+
+        The proposition "A >= B" is the mathematical converse of "B > A" (see self.__gt__)
+        """     
+        return 1-(other > self)
 
     def __abs__(self):
         """

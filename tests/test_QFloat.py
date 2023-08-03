@@ -177,10 +177,20 @@ class TestQFloat(unittest.TestCase):
                 raise ValueError( 'Wrong tidy value for QFloat: ' + str(qf) + ' toFloat : ' + str(qf.toFloat()) + ' for actual float : ', f)
             assert(qf.getSign() == (np.sign(f) or 1)) # check computed sign as well
 
+    def test_ge(self):
+        for i in range(100):
+            base = np.random.randint(2,3)
+            size = np.random.randint(30,40)
+            ints = np.random.randint(10,13)
+            f1 = (np.random.randint(0,20)-10)/10 # float of type (+/-)x.x
+            f2 = (np.random.randint(0,20)-10)/10 # float of type (+/-)x.x
+            qf1 = QFloat.fromFloat(f1, size, ints, base)
+            qf2 = QFloat.fromFloat(f2, size, ints, base)
+            assert( 1*(qf1 >= qf2) == 1*(f1 >= f2) )
 
 
 
 unittest.main()
 
-# suite = unittest.TestLoader().loadTestsFromName('test_QFloat.TestQFloat.test_mul_np')
+# suite = unittest.TestLoader().loadTestsFromName('test_QFloat.TestQFloat.test_ge')
 # unittest.TextTestRunner(verbosity=1).run(suite)
