@@ -591,6 +591,8 @@ class QFloat():
             else:
                 self._array = self._array[:-difflen]
 
+        return self
+
     def checkCompatibility(self, other):
         """
         Check wether other has equal encoding

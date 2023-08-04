@@ -368,10 +368,8 @@ def qf_lu_decomposition(M):
                 L[i][j] = QFloat.fromMul(PM[i][j], inv_Ujj, 20, 8)
 
     # PM = LU
-    P= transpose_2DList(P)
-
-    # now M = PLU
-    # Note that Ljj is always 1 for all j
+    P = transpose_2DList(P)
+    # now M = PLU (Note that Ljj is always 1 for all j)
     return P, L, U
 
 
@@ -391,9 +389,9 @@ def qf_lu_inverse(P, L, U, qf_len_out, qf_ints_out):
 
     # Backward substitution: Solve U * X = Y for X
     X = zeroListMatrix(n)
-    # precompute inverse of U to make less divisions
-    [ U[j][j].set_len_ints(10,8) for j in range(n)] # simplify U as we know its range
-    Ujj_inv = [U[j][j].invert(1, 20, 0) for j in range(n)]
+    
+    # precompute inverse of U to make less divisions (simplify U before as we know its range)
+    Ujj_inv = [U[j][j].set_len_ints(10,8).invert(1, 20, 0) for j in range(n)]
     for i in range(n - 1, -1, -1):
         X[i][-1] = QFloat.fromMul(Y[i][-1],Ujj_inv[-1], qf_len_out, qf_ints_out )
         for j in range(n - 2, -1, -1):
@@ -405,7 +403,7 @@ def qf_lu_inverse(P, L, U, qf_len_out, qf_ints_out):
 
 ########################################################################################
 #                               2x2 SHORCUT FORMULA
-################2#######################################################################
+########################################################################################
 
 def qf_inverse_2x2(qf_M, qf_len_out, qf_ints_out):
     """
