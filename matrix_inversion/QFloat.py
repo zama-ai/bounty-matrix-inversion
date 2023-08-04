@@ -634,7 +634,7 @@ class QFloat():
 
     def tidy(self):
         """
-        Tidy array so that values are in range [0, base]
+        Tidy array with negative values in range ]-base, base[ so they get to range [0, base[
         """
 
         # first of all, make all values (negative or positive) fall under the base:
