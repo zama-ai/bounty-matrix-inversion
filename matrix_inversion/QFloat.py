@@ -70,7 +70,7 @@ def float_to_base_p(f, precision, p):
 
 def base_p_addition(a, b, p, inplace=False):
     """
-    Add arrays in base p. (a and b must be tidy)
+    Add arrays in base p. (a and b must be positive and tidy)
     If a and b have different sizes, the longer array is considered to have extra zeros to the left
     if inplace is True, the result is written is a
     """
@@ -405,7 +405,7 @@ class QFloat():
             if not (isinstance(ints, int) and 0<=ints and array.size>=ints):
                 raise ValueError('ints must be in range [0,array.size]')
         self._ints = int(ints)
-        self._sign = sign
+        self._sign = sign # a sign of 0 makes the QFloat null
         if isinstance(self._sign, float):
             self._sign=int(self._sign)
 
@@ -447,8 +447,8 @@ class QFloat():
 
         sgn = self.getSign()
 
-        integerPart = (self._array[0:self._ints]).astype('int')
-        floatPart = (self._array[self._ints:]).astype('int')
+        integerPart = (self._array[0:self._ints]*(sgn!=0)).astype('int') # 0 is sign is 0
+        floatPart = (self._array[self._ints:]*(sgn!=0)).astype('int') # 0 is sign is 0
 
         if self._base <= 10:
             integerPart = ''.join([str(i) for i in integerPart])
@@ -503,7 +503,7 @@ class QFloat():
         integerPart = base_p_to_int(self._array[0:self._ints], self._base)
         floatPart = base_p_to_float(self._array[self._ints:], self._base)
 
-        return (integerPart + floatPart)*self._sign
+        return (integerPart + floatPart)*self._sign # will yield a 0 if sign is 0
 
 
     #=============================================================================================
@@ -723,8 +723,15 @@ class QFloat():
         Returns the absolute value
         """
         absval = self.copy()
-        absval._sign = fhe.ones(1)[0]
+        absval._sign *= absval._sign # stays 0 if 0
         return absval
+
+    def abs(self):
+        """
+        In place absolute value
+        """
+        self._sign *= self._sign # stays 0 if 0
+        return self
 
     def __add__(self, other):
         """
@@ -765,7 +772,7 @@ class QFloat():
         
         QFloat.ADDITIONS+=1 # count addition in all other cases, cause we have to tidy
 
-        # multiply array by sign first
+        # multiply array by sign first (becomes 0 if sign is 0)
         self._array *= self._sign
 
         if isinstance(other, Tracer) or isinstance(other, numbers.Integral):
@@ -793,13 +800,17 @@ class QFloat():
         """
         Subtract another QFLoat
         """
-        return self + (-other)
+        res = -other
+        res += self
+        return res
 
     def __rsub__(self, other):
         """
         Add other object on the right
         """
-        return -self + other
+        res = -self
+        res += other
+        return res
 
     def __imul__(self, other):
         """
@@ -811,18 +822,16 @@ class QFloat():
             self.selfCheckConvertFHE(isinstance(other, Tracer))
             # multiply everything by a single integer
             sign=np.sign(other)
-            self._array *= (other*sign)
-            self._isBaseTidy=False
+            self._array *= (other*sign)            
             self._sign *= sign
+            self._isBaseTidy=False
             self.baseTidy()
 
         elif isinstance(other, SignedBinary):
             self.selfCheckConvertFHE(other._encrypted)
-            # multiply everything by a binary value, which keeps the array tidy
-            sign=np.sign(other.value)
-            self._array *= (other.value*sign)
-            #self._isBaseTidy are not impacted here
-            self._sign *= sign
+            # multiplying by a binary value is the same as multiplying the sign, aka the value
+            # if the vale is zero, the sign becomes zero which will yield a zero QFloat
+            self._sign *= other.value
         else:
             QFloat.MULTIPLICATION+=1 # count only multiplications with other Qfloat
             # multiply with another compatible QFloat 
@@ -890,6 +899,7 @@ class QFloat():
     def neg(self):
         """
         In place negative
+        Use it for faster subtraction if you don't need to keep the second QFloat: a - b = a + b.neg()
         """    
         self._sign *= -1
         return self
