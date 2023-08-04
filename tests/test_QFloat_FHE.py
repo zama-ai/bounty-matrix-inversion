@@ -186,7 +186,7 @@ class TestQFloat(unittest.TestCase):
 
 
     def test_mul_fhe(self):
-        # test add and sub
+        # test mul
         print('test_mul_fhe')
 
         def mul_qfloats(qf_arrays, qf_signs, params):
@@ -206,6 +206,25 @@ class TestQFloat(unittest.TestCase):
             multiplication = circuit.run(np.array([f1,f2]), False)[0]
             assert(multiplication  - (f1*f2) < 0.01)
 
+    def test_mul_sb_fhe(self):
+        # test mul by signed binary
+        print('test_mul_sb_fhe')
+
+        def mul_sb_qfloat(qf_arrays, qf_signs, params):
+            qf_len, qf_ints, qf_base = params
+            a,_ = qfloat_arrays_to_qfloat_list(qf_arrays, qf_signs, qf_ints, qf_base)
+            res = a*SignedBinary(fhe.ones(1)[0])
+            return qfloat_list_to_qfloat_arrays([res], qf_len, qf_ints, qf_base)
+
+        for i in range(1):
+            base = BASE or np.random.randint(2,10)
+            size = SIZE or np.random.randint(20,30)
+            ints = size//2#np.random.randint(12, 16)
+            f1 = np.random.uniform(0,100,1)[0]
+
+            circuit = QFloatCircuit(2, mul_sb_qfloat, size, ints, base)
+            multiplication = circuit.run(np.array([f1,0]), False)[0]
+            assert(multiplication  - f1 < 0.01)
 
     def test_from_mul_fhe(self):
         # test add and sub
@@ -301,5 +320,5 @@ class TestQFloat(unittest.TestCase):
 
 #unittest.main()
 
-suite = unittest.TestLoader().loadTestsFromName('test_QFloat_FHE.TestQFloat.test_div_fhe')
+suite = unittest.TestLoader().loadTestsFromName('test_QFloat_FHE.TestQFloat.test_mul_sb_fhe')
 unittest.TextTestRunner(verbosity=1).run(suite)
