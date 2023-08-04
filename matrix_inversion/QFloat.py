@@ -1047,6 +1047,9 @@ class QFloat():
         """
         Compute the signed invert of the QFloat, with different length and ints values if requested
         """
+        if not (isinstance(sign, SignedBinary) or (isinstance(sign,numbers.Integral) and abs(sign)==1) ):
+            raise ValueError("sign must be a SignedBinary or a signed binary scalar")
+
         QFloat.DIVISION+=1 # this division is counted because it is heavy
 
         # tidy before dividing
