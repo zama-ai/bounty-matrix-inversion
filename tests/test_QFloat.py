@@ -35,9 +35,13 @@ class TestQFloat(unittest.TestCase):
         qf = QFloat.fromFloat(-13.75, 10, 5, 2)
         assert(str(qf)=='-01101.11000')
 
-        #zero
+        #zero by value or sign
         qf = QFloat.fromFloat(0, 10, 5, 2)
         assert(str(qf)=='00000.00000')
+
+        qf = QFloat.fromFloat(1, 10, 5, 2)
+        qf._sign = 0
+        assert(str(qf)=='00000.00000')        
 
 
     def test_getSign_np(self):
@@ -85,6 +89,9 @@ class TestQFloat(unittest.TestCase):
             qf1 += qf2
             assert( qf1.toFloat()-(f1+f2) < 0.1 ) # iadd
 
+            qf1._sign = 0 # sign is 0 must behave like a 0
+            assert( (qf1+qf2).toFloat()-(f2) < 0.1 ) 
+
     def test_mul_np(self):
         # test multiplication by QFloat and integer
         for i in range(100):
@@ -111,13 +118,16 @@ class TestQFloat(unittest.TestCase):
             qf1 *= qf2
             assert( qf1.toFloat()-(f1*f2) < 0.1 ) # imul
 
+            qf1._sign = 0 # sign is 0 must behave like a 0
+            assert( (qf1*qf2).toFloat() == 0 )            
+
             # from mul with specific values
             f1 = (np.random.randint(1,100)/1.0) # float of type (+/-)xx.
             f2 = (np.random.randint(1,10000))/10000000 # float of type (+/-)0.000xxx
             qf1 = QFloat.fromFloat(f1, 18, 18, 2)
             qf2 = QFloat.fromFloat(f2, 25, 0, 2)
             # from mul
-            assert( QFloat.fromMul(qf1, qf2, 18, 1).toFloat()-(f1*f2) < 0.1 )            
+            assert( QFloat.fromMul(qf1, qf2, 18, 1).toFloat()-(f1*f2) < 0.1 )    
 
 
     def test_div_np(self):
