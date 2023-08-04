@@ -374,9 +374,6 @@ class QFloat():
     MULTIPLICATION=0
     DIVISION=0
 
-    # table look up for quicker computations in baseTidy function in binary
-    DIV2TIDY_TABLE = fhe.LookupTable([0, 0, 1, -1, 0])
-
     def __init__(self, array, ints=None, base=2, isBaseTidy=True, sign=1):
         """
         - array: an encrypted or unencrypted array representing a number in base p (little endian)
@@ -618,24 +615,6 @@ class QFloat():
         """
         return self._sign
 
-    def base2Tidy(self):
-        """
-        Tidy binary array so that values are in range [-1, 1] as they should be, but signs can be mixed
-        The array must have values in range [-2, 2] in this case, and the base should be 2
-        Keeping arrays untidy when possible saves computation time
-        """
-        if self._isBaseTidy:
-            return
-
-        dividend = 0
-        for i in reversed(range(len(self))):
-            curr = self._array[i]+dividend
-            dividend = QFloat.DIV2TIDY_TABLE[curr]
-            curr -= dividend*2
-            self._array[i] = curr
-
-        self._isBaseTidy = True
-
     def baseTidy(self):
         """
         Tidy array so that values are in range [-(base-1), base-1] as they should be, but signs can be mixed
@@ -813,9 +792,6 @@ class QFloat():
 
         self._isBaseTidy=False
         self._sign=None
-
-        if self._base == 2:
-            self.base2Tidy() # quicker base tidying if we are in binary, after an addition of 2 binary arrays
 
         # tidy the qflloat to make the integers positive and know the sign
         self.tidy()
