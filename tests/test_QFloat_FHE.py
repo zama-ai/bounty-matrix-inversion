@@ -300,5 +300,5 @@ class TestQFloat(unittest.TestCase):
 
 #unittest.main()
 
-suite = unittest.TestLoader().loadTestsFromName('test_QFloat_FHE.TestQFloat.test_div_fhe')
+suite = unittest.TestLoader().loadTestsFromName('test_QFloat_FHE.TestQFloat.test_add_sub_fhe')
 unittest.TextTestRunner(verbosity=1).run(suite)
