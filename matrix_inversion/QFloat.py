@@ -22,20 +22,31 @@ def base_p_to_int(arr, p):
 
 def int_to_base_p(integer, n, p):
     """
-    Convert a base-p array to a float of the form 0.xxx..
+    Convert an integer into base-p array
     Can be signed (+/- values)
-    """    
+    """   
     if n==0:
-        return np.array([])
-    # Convert the integer to a base p string
-    base_p_string= np.base_repr(np.abs(integer), p)
-    # Prepend zeros to the binary representation until it reaches the desired size
-    base_p_string = base_p_string.zfill(n)
-    if len(base_p_string) > n:
-        raise Exception(f"integer: {integer} cannot be represented with {n} values in base {p}")
-    # Convert the base_p string to a NumPy array of integers
-    base_p_array = np.sign(integer)*np.array([int(digit) for digit in base_p_string])
-    return base_p_array
+        return np.array([], dtype='int')
+
+    sgn = int(np.sign(integer))
+    integer = int(np.abs(integer))  
+    
+    if not isinstance(integer, int) or not isinstance(n, int) or not isinstance(p, int):
+        raise ValueError("All inputs must be integers")
+    if integer < 0 or n <= 0 or p <= 1:
+        print(integer, n, p)
+        raise ValueError("Invalid input values")
+
+    result = np.zeros(n, dtype=int)
+    
+    for i in reversed(range(n)):
+        power=pow(p,i)        
+        div = integer//power
+        integer -= (div*power)
+        result[n-1-i] = div
+
+    return result*sgn
+
 
 def base_p_to_float(arr, p):
     """
@@ -490,7 +501,8 @@ class QFloat():
         array[ints:] = floatArray
         sign = np.sign(f) or 1 # zero has sign 1
 
-        return QFloat(array*sign, ints, base, True, sign)
+        # set with abs value of array
+        return QFloat(np.abs(array), ints, base, True, sign)
 
     def toFloat(self):
         """
