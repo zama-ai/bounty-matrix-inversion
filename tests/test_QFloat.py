@@ -8,6 +8,8 @@ sys.path.append(os.getcwd())
 
 from matrix_inversion.QFloat import QFloat, SignedBinary
 
+BASE=2
+SIZE=32
 
 class TestQFloat(unittest.TestCase):
 
@@ -17,8 +19,8 @@ class TestQFloat(unittest.TestCase):
 
         # test conversion from float to QFloat and vice-versa
         for i in range(100):
-            base = np.random.randint(2,10)
-            size = np.random.randint(20,30)
+            base = BASE or np.random.randint(2,10)
+            size = SIZE or np.random.randint(20,30)
             ints = np.random.randint(8,12)
             f = (np.random.randint(0,20000)-10000)/100 # float of type (+/-)xx.xx
             qf = QFloat.fromFloat(f, size, ints, base)
@@ -54,8 +56,8 @@ class TestQFloat(unittest.TestCase):
 
         # non zero
         for i in range(100):
-            base = np.random.randint(2,10)
-            size = np.random.randint(20,30)
+            base = BASE or np.random.randint(2,10)
+            size = SIZE or np.random.randint(20,30)
             ints = np.random.randint(8,12)
             f = (np.random.randint(0,20000)-10000)/100 # float of type (+/-)xx.xx
             if f==0:
@@ -68,8 +70,8 @@ class TestQFloat(unittest.TestCase):
     def test_add_sub_np(self):
         # test add and sub
         for i in range(100):
-            base = np.random.randint(2,10)
-            size = np.random.randint(20,30)
+            base = BASE or np.random.randint(2,10)
+            size = SIZE or np.random.randint(20,30)
             ints = np.random.randint(8,12)
             f1 = (np.random.randint(0,20000)-10000)/100 # float of type (+/-)xx.xx
             f2 = (np.random.randint(0,20000)-10000)/100 # float of type (+/-)xx.xx
@@ -95,8 +97,8 @@ class TestQFloat(unittest.TestCase):
     def test_mul_np(self):
         # test multiplication by QFloat and integer
         for i in range(100):
-            base = np.random.randint(2,3)
-            size = np.random.randint(30,40)
+            base = BASE or np.random.randint(2,3)
+            size = SIZE or np.random.randint(30,40)
             ints = np.random.randint(10,13)
             f1 = (np.random.randint(0,200)-100)/10 # float of type (+/-)x.x
             f2 = (np.random.randint(0,200)-100)/10 # float of type (+/-)x.x
@@ -133,8 +135,8 @@ class TestQFloat(unittest.TestCase):
     def test_div_np(self):
         # test division
         for i in range(100):
-            base = np.random.randint(2,3)
-            size = np.random.randint(30,40)
+            base = BASE or np.random.randint(2,3)
+            size = SIZE or np.random.randint(30,40)
             ints = np.random.randint(10,13)
             f1 = (np.random.randint(0,200)-100)/10 # float of type (+/-)x.x
             f2 = (np.random.randint(0,200)-100)/10 # float of type (+/-)x.x
@@ -162,8 +164,8 @@ class TestQFloat(unittest.TestCase):
 
     def test_abs_np(self):
         for i in range(100):
-            base = np.random.randint(2,3)
-            size = np.random.randint(30,40)
+            base = BASE or np.random.randint(2,3)
+            size = SIZE or np.random.randint(30,40)
             ints = np.random.randint(10,13)
             f1 = (np.random.randint(0,200)-100)/10 # float of type (+/-)x.x
             qf1 = QFloat.fromFloat(f1, size, ints, base)
@@ -173,8 +175,8 @@ class TestQFloat(unittest.TestCase):
     def test_tidy_np(self):
         # mixed signs
         for i in range(100):
-            base = np.random.randint(2,10)
-            size = np.random.randint(20,30)
+            base = BASE or np.random.randint(2,10)
+            size = SIZE or np.random.randint(20,30)
             ints = np.random.randint(size//2-2,size//2+2)
             arr = np.zeros(size)
             i1 = len(arr)//4
@@ -189,8 +191,8 @@ class TestQFloat(unittest.TestCase):
 
     def test_ge(self):
         for i in range(100):
-            base = np.random.randint(2,3)
-            size = np.random.randint(30,40)
+            base = BASE or np.random.randint(2,3)
+            size = SIZE or np.random.randint(30,40)
             ints = np.random.randint(10,13)
             f1 = (np.random.randint(0,20)-10)/10 # float of type (+/-)x.x
             f2 = (np.random.randint(0,20)-10)/10 # float of type (+/-)x.x

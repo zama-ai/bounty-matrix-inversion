@@ -8,9 +8,9 @@ sys.path.append(os.getcwd())
 
 from matrix_inversion.QFloat import QFloat, SignedBinary
 
-
-BASE=2
-SIZE=25
+POWER=5
+BASE=2^POWER
+SIZE=int(np.ceil(32/POWER))
 
 def print_red(text):
     # ANSI escape sequence for red color
@@ -176,7 +176,7 @@ class TestQFloat(unittest.TestCase):
         for i in range(10):
             base = BASE or np.random.randint(2,10)
             size = SIZE or np.random.randint(20,30)
-            ints = np.random.randint(12, 16)
+            ints = SIZE//2 if SIZE else np.random.randint(12, 16)
             f1 = np.random.uniform(0,100,1)[0]
             f2 = np.random.uniform(0,100,1)[0]
 
@@ -198,7 +198,7 @@ class TestQFloat(unittest.TestCase):
         for i in range(1):
             base = BASE or np.random.randint(2,10)
             size = SIZE or np.random.randint(20,30)
-            ints = size//2#np.random.randint(12, 16)
+            ints = SIZE//2 if SIZE else np.random.randint(12, 16)
             f1 = np.random.uniform(0,100,1)[0]
             f2 = np.random.uniform(0,100,1)[0]
 
@@ -219,7 +219,7 @@ class TestQFloat(unittest.TestCase):
         for i in range(1):
             base = BASE or np.random.randint(2,10)
             size = SIZE or np.random.randint(20,30)
-            ints = size//2#np.random.randint(12, 16)
+            ints = SIZE//2 if SIZE else np.random.randint(12, 16)
             f1 = np.random.uniform(0,100,1)[0]
 
             circuit = QFloatCircuit(2, mul_sb_qfloat, size, ints, base)
@@ -264,7 +264,7 @@ class TestQFloat(unittest.TestCase):
         for i in range(10):
             base = BASE or np.random.randint(2,10)
             size = SIZE or np.random.randint(20,30)
-            ints = size//2#np.random.randint(12, 16)
+            ints = SIZE//2 if SIZE else np.random.randint(12, 16)
             f1 = np.random.uniform(0,100,1)[0]
             f2 = np.random.uniform(0,100,1)[0]
 
@@ -285,7 +285,7 @@ class TestQFloat(unittest.TestCase):
         for i in range(10):
             base = BASE or np.random.randint(2,10)
             size = SIZE or np.random.randint(20,30)
-            ints = np.random.randint(12, 16)
+            ints = SIZE//2 if SIZE else np.random.randint(12, 16)
             f1 = np.random.uniform(0,100,1)[0]
             f2 = np.random.uniform(0,100,1)[0]
 
@@ -309,7 +309,7 @@ class TestQFloat(unittest.TestCase):
         for i in range(1):
             base = BASE or np.random.randint(2,10)
             size = SIZE or np.random.randint(20,30)
-            ints = size//2#np.random.randint(12, 16)
+            ints = SIZE//2 if SIZE else np.random.randint(12, 16)
             f1 = np.random.uniform(0,100,1)[0]
             f2 = np.random.uniform(0,100,1)[0]
 
@@ -320,5 +320,7 @@ class TestQFloat(unittest.TestCase):
 
 #unittest.main()
 
-suite = unittest.TestLoader().loadTestsFromName('test_QFloat_FHE.TestQFloat.test_mul_sb_fhe')
+#suite = unittest.TestLoader().loadTestsFromName('test_QFloat_FHE.TestQFloat.test_add_sub_fhe')
+#suite = unittest.TestLoader().loadTestsFromName('test_QFloat_FHE.TestQFloat.test_div_fhe')
+suite = unittest.TestLoader().loadTestsFromName('test_QFloat_FHE.TestQFloat.test_mul_fhe')
 unittest.TextTestRunner(verbosity=1).run(suite)

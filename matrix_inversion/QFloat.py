@@ -26,15 +26,14 @@ def int_to_base_p(integer, n, p):
     Can be signed (+/- values)
     """   
     if n==0:
-        return np.array([], dtype='int')
+        return np.array([], dtype=int)
 
     sgn = int(np.sign(integer))
     integer = int(np.abs(integer))  
-    
+
     if not isinstance(integer, int) or not isinstance(n, int) or not isinstance(p, int):
         raise ValueError("All inputs must be integers")
     if integer < 0 or n <= 0 or p <= 1:
-        print(integer, n, p)
         raise ValueError("Invalid input values")
 
     result = np.zeros(n, dtype=int)
@@ -46,7 +45,6 @@ def int_to_base_p(integer, n, p):
         result[n-1-i] = div
 
     return result*sgn
-
 
 def base_p_to_float(arr, p):
     """
