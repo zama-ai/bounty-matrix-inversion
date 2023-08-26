@@ -4,7 +4,7 @@ from typing import Tuple
 import numpy as np
 from concrete import fhe
 
-from qf_invert import qf_matrix_inverse, float_matrix_to_qfloat_arrays, qfloat_arrays_to_float_matrix
+from qf_invert import qf_matrix_inverse, float_matrix_to_qfloat_arrays, qfloatNsigns_arrays_to_float_matrix
 
 # def invert_matrix(x):
 #     return x
@@ -13,19 +13,17 @@ class EncryptedMatrixInversion:
     shape: Tuple[int, int]
     circuit: fhe.Circuit
 
-    def __init__(self, n, sampler):
+    def __init__(self, n, sampler, qf_base = 2, qf_len = 32, qf_ints = 16, trueDivision=False):
         self.shape = (n, n)
 
         # custom quantization parameters
-        self.qf_len = 12; # QFloats length
-        self.qf_ints = 9; # QFloats integer part length
-        self.qf_base = 2; # QFloats base (2=binary)
-        self.qf_len_out=20; # output QFloats length
-        self.qf_ints_out = 8; # output QFloats integer part length
+        self.qf_base = qf_base; # QFloats base (2=binary)
+        self.qf_len = qf_len; # QFloats length
+        self.qf_ints = qf_ints; # QFloats integer part length
 
-        params = [n, self.qf_len, self.qf_ints, self.qf_base, self.qf_len_out, self.qf_ints_out]
+        params = [n, self.qf_len, self.qf_ints, self.qf_base, trueDivision]
 
-        inputset = [sampler() for _ in range(1000)]
+        inputset = [sampler() for _ in range(100)]
         for sample in inputset:
             assert isinstance(sample, np.ndarray)
             assert np.issubdtype(sample.dtype, np.floating)
@@ -53,7 +51,7 @@ class EncryptedMatrixInversion:
         return self.circuit.decrypt(encrypted_quantized_inverted_matrix)
 
     def dequantize(self, quantized_inverted_matrix: np.ndarray) -> np.ndarray:
-        return qfloat_arrays_to_float_matrix(quantized_inverted_matrix, self.qf_ints_out, self.qf_base)
+        return qfloatNsigns_arrays_to_float_matrix(quantized_inverted_matrix, self.qf_ints, self.qf_base)
 
     def run(self, matrix: np.ndarray, simulate=False) -> np.ndarray:
         assert np.issubdtype(matrix.dtype, np.floating)
@@ -78,8 +76,37 @@ class EncryptedMatrixInversion:
 normal_sampler = ("Normal", lambda: np.random.randn(n, n) * 100)
 uniform_sampler = ("Uniform", lambda: np.random.uniform(0, 100, (n, n)))
 
+
+"""
+Custom quantization parameters :
+
+qf_len = QFloats length
+qf_ints = QFloats integer part length
+qf_base = QFloats base (2=binary)
+
+trueDivision: wether to perform true divisions in the inversion algorithm (more precise but slower)
+"""
+
+# less precise, more prone to errors, but faster
+trueDivision = False
+qf_base = 2; qf_len = 23; qf_ints = 9;
+
+# intermediate precision
+#trueDivision = False
+#qf_base = 2; qf_len = 28; qf_ints = 13;  # intermediate
+
+# more precise, less prone to errors, but slower
+#trueDivision = False
+#qf_base = 2; qf_len = 32; qf_ints = 16;
+
+# even more precise, even less prone to errors, but even slower
+#trueDivision = True
+#qf_base = 2; qf_len = 32; qf_ints = 16; # more precise, less prone to errors, but slower
+
+#qf_base = 16; qf_len = 8; qf_ints = 4; # to test with the new release (concrete bug for now), could be faster
+
 for name, sampler in {normal_sampler, uniform_sampler}:
-    for n in {3, 5, 10}:        
+    for n in [2, 3, 5, 10]:
         print()
 
         title = f"Sampler={name}, N={n}"
@@ -88,7 +115,7 @@ for name, sampler in {normal_sampler, uniform_sampler}:
 
         print(f"Compiling...")
         start = time.time()
-        encrypted_matrix_inversion = EncryptedMatrixInversion(n, sampler)
+        encrypted_matrix_inversion = EncryptedMatrixInversion(n, sampler, qf_base, qf_len, qf_ints, trueDivision)
         end = time.time()
         print(f"(took {end - start:.3f} seconds)")
 

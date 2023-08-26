@@ -1,3 +1,8 @@
+"""
+This module implements the QFloat object which allows to quantize floating point values in FHE
+author : Lcressot 
+"""
+
 import numpy as np
 import numbers
 from concrete import fhe
@@ -144,33 +149,6 @@ def base_p_division(dividend, divisor, p):
 
     return quotient   
 
-# def base_p_division_fp(dividend, divisor, p, fp):
-#     """
-#     Divide arrays in base p. (dividend and divisor must be tidy and positive)
-#     Optimized for fp (float prevision fp) where we consider that the fp first 
-#     digits of the result should be zeros, (else it would be an overflow) and
-#     so start with a biger remainder of size fp
-#     """    
-#     # Initialize the quotient array
-#     quotient = fhe.zeros(dividend.size)
-#     # Initialize the remainder
-#     remainder = dividend[0:fp]
-
-#     for i in range(fp,dividend.size):
-#         if i>0:
-#             # Left-roll the remainder and bring down the next bit from the dividend
-#             # also cut remainder if its size is bigger than divisor's, cause there are extra zeros
-#             d=1*(remainder.size > divisor.size)
-#             remainder = np.concatenate((remainder[d:], dividend[i].reshape(1)), axis=0)
-#         # If the remainder is larger than or equal to the divisor
-#         for j in range(p-1): 
-#             is_ge = is_greater_or_equal_base_p(remainder, divisor)
-#             # Subtract the divisor from the remainder
-#             remainder = is_ge*base_p_subtraction(remainder, divisor, p) + (1-is_ge)*remainder
-#             # Set the current quotient bit to 1
-#             quotient[i] += is_ge
-
-#     return quotient      
 
 def is_greater_or_equal(a, b):
     """
@@ -370,12 +348,16 @@ class SignedBinary():
 class QFloat():
     """
     A class for quantizing floats
-    Floats are encoded as encrypted or unencrypted arrays of integers in a specified base (the fastest for fhe is base 2)
+    Floats are encoded as encrypted or unencrypted arrays of integers in a specified base
     Encrypted QFloat can be summed, multiplied etc. with unencrypted QFloats, and vice-versa
 
-    TODO: replace length + ints with length + dot position where dot position can be negative to encode efficiently
+    TODO:
+    - allow operations (see fromMul) between QFloats of different lengths to optimize algorithms
+    - replace length + ints with length + dot position where dot position can be negative to encode efficiently
     for very low numbers. For isntance: 0.000000001110 encoded as -.--------1110 with dot position = -8
-    TODO: fast inversion algorithm using dichotomia search
+    - keep track of overflow (in tidy, set QFloat.overflow = dividend) then decrypt this value to know if the computation failed
+    - do not compute tidying on the floating part when adding an integer or SignedBinary in iadd
+
     """
 
     # Statistics for counting operations between QFloats within a circuit
@@ -640,6 +622,9 @@ class QFloat():
             curr -= dividend*self._base
             self._array[i] = curr
 
+        # TODO: keep track of overflow
+        # QFloat.OVERFLOW = dividend
+
         self._isBaseTidy = True
 
     def tidy(self):
@@ -791,9 +776,11 @@ class QFloat():
             self.selfCheckConvertFHE(isinstance(other, Tracer))
             # Add a single integer
             self._array[self._ints-1]+=other
+            # TODO : in this case, we don't need to baseTidy the floating part of the QFloat
         elif isinstance(other, SignedBinary):
             self.selfCheckConvertFHE(other._encrypted)
-            self._array[self._ints-1]+=other.value        
+            self._array[self._ints-1]+=other.value  
+            # TODO : in this case, we don't need to baseTidy the floating part of the QFloat
         else:
             self.selfCheckConvertFHE(other._encrypted)
 

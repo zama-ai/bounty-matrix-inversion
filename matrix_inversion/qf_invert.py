@@ -14,11 +14,15 @@ Tracer = fhe.tracing.tracer.Tracer
 # ██    ██ ██████  ██ ██   ███ ██ ██ ██  ██ ███████ ██          ██      ██    ██     ██ ██ ██  ██ ██    ██ █████   ██████  ███████ █████   
 # ██    ██ ██   ██ ██ ██    ██ ██ ██  ██ ██ ██   ██ ██          ██      ██    ██     ██ ██  ██ ██  ██  ██  ██      ██   ██      ██ ██      
 #  ██████  ██   ██ ██  ██████  ██ ██   ████ ██   ██ ███████     ███████  ██████      ██ ██   ████   ████   ███████ ██   ██ ███████ ███████ 
-                                                                                                                                         
+         
+# the python algorithm operating of floats for inverting matrices
+
 #============================================================================================================================================                                                                                                                                         
 
 def pivot_matrix(M):
-    """Returns the pivoting matrix for M, used in Doolittle's method."""
+    """
+    Returns the pivoting matrix for M, used in Doolittle's method.
+    """
     assert(M.shape[0]==M.shape[1])
     n = M.shape[0]
 
@@ -36,8 +40,10 @@ def pivot_matrix(M):
     return id_mat
 
 def lu_decomposition(M):
-    """Performs an LU Decomposition of M (which must be square)
-    into PM = LU. The function returns P, L, and U."""
+    """
+    Performs a LU Decomposition of M (which must be square)
+    into PM = LU. The function returns P, L, and U.
+    """
     assert(M.shape[0]==M.shape[1])
     n = M.shape[0]
 
@@ -72,6 +78,9 @@ def lu_decomposition(M):
     return P, L, U
 
 def lu_inverse(P, L, U, debug=False):
+    """
+    Compute inverse using the P,L,U decomposition
+    """
     n = L.shape[0]
 
     # Forward substitution: Solve L * Y = P * A for Y
@@ -119,12 +128,14 @@ def test_matrix_inverse(n, m=100):
 
 #============================================================================================================================================
 
-    #  ██████  ███████ ██       ██████   █████  ████████     ███████ ██    ██ ███    ██  ██████ ████████ ██  ██████  ███    ██ ███████ 
-    # ██    ██ ██      ██      ██    ██ ██   ██    ██        ██      ██    ██ ████   ██ ██         ██    ██ ██    ██ ████   ██ ██      
-    # ██    ██ █████   ██      ██    ██ ███████    ██        █████   ██    ██ ██ ██  ██ ██         ██    ██ ██    ██ ██ ██  ██ ███████ 
-    # ██ ▄▄ ██ ██      ██      ██    ██ ██   ██    ██        ██      ██    ██ ██  ██ ██ ██         ██    ██ ██    ██ ██  ██ ██      ██ 
-    #  ██████  ██      ███████  ██████  ██   ██    ██        ██       ██████  ██   ████  ██████    ██    ██  ██████  ██   ████ ███████ 
-    #     ▀▀                                                                                                                           
+#  ██████  ███████ ██       ██████   █████  ████████     ███████ ██    ██ ███    ██  ██████ ████████ ██  ██████  ███    ██ ███████ 
+# ██    ██ ██      ██      ██    ██ ██   ██    ██        ██      ██    ██ ████   ██ ██         ██    ██ ██    ██ ████   ██ ██      
+# ██    ██ █████   ██      ██    ██ ███████    ██        █████   ██    ██ ██ ██  ██ ██         ██    ██ ██    ██ ██ ██  ██ ███████ 
+# ██ ▄▄ ██ ██      ██      ██    ██ ██   ██    ██        ██      ██    ██ ██  ██ ██ ██         ██    ██ ██    ██ ██  ██ ██      ██ 
+#  ██████  ██      ███████  ██████  ██   ██    ██        ██       ██████  ██   ████  ██████    ██    ██  ██████  ██   ████ ███████ 
+#     ▀▀                                                                                                                           
+
+# functions working on QFloats instead of floats
 
 #============================================================================================================================================
 
@@ -323,10 +334,12 @@ def qf_pivot_matrix(M):
 ########################################################################################
 
 
-def qf_lu_decomposition(M, qf_len, qf_ints):
+def qf_lu_decomposition(M, qf_len, qf_ints, trueDivision=False):
     """
-    Performs an LU Decomposition of square QFloats 2D-list matrix M
+    Perform a LU decomposition of square (QFloats 2D-list) matrix M 
     The function returns P, L, and U such that M = PLU. 
+
+    trueDivision: Wether to compute true divisions instead of multiplying by inverse. Setting it to True is more precise but slower
     """
     assert(len(M)==len(M[0]))
     n = len(M)
@@ -358,17 +371,23 @@ def qf_lu_decomposition(M, qf_len, qf_ints):
                 U[i][j] = PM[i][j].copy()
 
         # l_{ij} = \frac{1}{u_{jj}} (a_{ij} - \sum_{k=1}^{j-1} u_{kj} l_{ik})
-        #inv_Ujj = U[j][j].invert(1, int(qf_len*2), 0) # compute one precise invert division and then use multiplications
+        if not trueDivision:
+            inv_Ujj = U[j][j].invert(1, qf_len, 0) # compute one precise invert division and then use multiplications, faster but less precise
         for i in range(j+1, n):
             if j>0:
                 s2 = qf_list_dot_product([U[k][j] for k in range(0,j)], [L[i][k] for k in range(0,j)])
                 #L[i][j] = (PM[i][j] - s2) * inv_Ujj
-                #L[i][j] = QFloat.fromMul((PM[i][j] + s2.neg()),inv_Ujj, qf_len, qf_ints)
-                L[i][j] = (PM[i][j] + s2.neg()) / U[j][j]
+                if trueDivision:
+                    L[i][j] = (PM[i][j] + s2.neg()) / U[j][j]                    
+                else:
+                    L[i][j] = QFloat.fromMul((PM[i][j] + s2.neg()),inv_Ujj, qf_len, qf_ints)
+                    
             else:
                 #L[i][j] = PM[i][j] / U[j][j]
-                #L[i][j] = QFloat.fromMul(PM[i][j], inv_Ujj, qf_len, qf_ints)
-                L[i][j] = PM[i][j] / U[j][j]
+                if trueDivision:
+                    L[i][j] = PM[i][j] / U[j][j]
+                else:
+                    L[i][j] = QFloat.fromMul(PM[i][j], inv_Ujj, qf_len, qf_ints)
 
     # for now, PM = LU
     P = transpose_2DList(P)
@@ -380,7 +399,12 @@ def qf_lu_decomposition(M, qf_len, qf_ints):
 #                                   LU INVERSE
 ########################################################################################
 
-def qf_lu_inverse(P, L, U, qf_len, qf_ints, debug=False):
+def qf_lu_inverse(P, L, U, qf_len, qf_ints, trueDivision=False, debug=False):
+    """
+    Compute inverse using the P,L,U decomposition (operating on QFloats 2D-lists)
+
+    trueDivision: Wether to compute true divisions instead of multiplying by inverse. Setting it to True is more precise but slower
+    """
     n = len(L)
 
     # Forward substitution: Solve L * Y = P * A for Y
@@ -396,16 +420,22 @@ def qf_lu_inverse(P, L, U, qf_len, qf_ints, debug=False):
     X = zeroListMatrix(n)
     
     # precompute inverse of U to make less divisions (simplify U before as we know its range)
-    #Ujj_inv = [U[j][j].invert(1, int(qf_len*2), 0) for j in range(n)]
+    if not trueDivision:
+        Ujj_inv = [U[j][j].invert(1, qf_len, 0) for j in range(n)]
     for i in range(n - 1, -1, -1):
         #X[i, -1] = Y[i, -1] / U[-1, -1]
-        #X[i][-1] = QFloat.fromMul(Y[i][-1], Ujj_inv[-1], qf_len, qf_ints)
-        X[i][-1] = Y[i][-1] / U[-1][-1]
+        if trueDivision:
+            X[i][-1] = Y[i][-1] / U[-1][-1]
+        else:
+            X[i][-1] = QFloat.fromMul(Y[i][-1], Ujj_inv[-1], qf_len, qf_ints)
+        
         for j in range(n - 2, -1, -1):
             #X[i, j] = (Y[i, j] - np.dot(U[j, j+1:], X[i, j+1:])) / U[j, j]
             temp = (Y[i][j] - qf_list_dot_product( [ U[j][k] for k in range(j+1,n)], [ X[i][k] for k in range(j+1,n) ]))
-            #X[i][j] = QFloat.fromMul(temp, Ujj_inv[j], qf_len, qf_ints)
-            X[i][j] = temp / U[j][j]
+            if trueDivision:
+                X[i][j] = temp / U[j][j]
+            else:
+                X[i][j] = QFloat.fromMul(temp, Ujj_inv[j], qf_len, qf_ints)
 
     if not debug:
         return transpose_2DList(X)
@@ -425,13 +455,12 @@ def qf_inverse_2x2(qf_M, qf_len, qf_ints):
     [a, b] = qf_M[0]
     [c, d] = qf_M[1]
 
-    ad = QFloat.fromMul(a,d, 2*qf_ints, 2*qf_ints) # produces an longer integer with no decimals
-    bc = QFloat.fromMul(b,c, 2*qf_ints, 2*qf_ints) # produces an longer integer with no decimals
+    ad = QFloat.fromMul(a,d, 2*qf_ints+3, 2*qf_ints) # produces a longer integer part
+    bc = QFloat.fromMul(b,c, 2*qf_ints+3, 2*qf_ints) # produces a longer integer part
 
     det = ad - bc # determinant of M in 17 bits
 
     det_inv = det.invert(1, qf_len, 0) # computes invert with a lot of decimals but no integer part
-    #det_inv = det.invert(1, 6, 0) # computes invert with a lot of decimals but no integer part
 
     mul = lambda x,y: QFloat.fromMul(x, y, qf_len, qf_ints) # multiply to output format
     M_inv = [[mul(d, det_inv), mul(b, det_inv).neg()], [mul(c, det_inv).neg(), mul(a, det_inv)]]
@@ -447,7 +476,7 @@ def qf_pivot(qf_arrays, qf_signs, params):
     """
     computes only the pivot matrix
     """
-    [n, qf_len, qf_ints, qf_base] = params
+    [n, qf_len, qf_ints, qf_base, _] = params
 
     assert( n*n == qf_arrays.shape[0])
     assert( qf_len == qf_arrays.shape[1])
@@ -465,7 +494,7 @@ def qf_lu_L(qf_arrays, qf_signs, params):
     """
     compute only PLU and returns L
     """
-    [n, qf_len, qf_ints, qf_base] = params
+    [n, qf_len, qf_ints, qf_base, trueDivision] = params
 
     assert( n*n == qf_arrays.shape[0])
     assert( qf_len == qf_arrays.shape[1])
@@ -474,7 +503,7 @@ def qf_lu_L(qf_arrays, qf_signs, params):
     qf_M = qfloat_arrays_to_QFloat_matrix(qf_arrays, qf_signs, qf_ints, qf_base)
 
     # compute the LU decomposition
-    bin_P, qf_L, qf_U = qf_lu_decomposition(qf_M, qf_len, qf_ints)    
+    bin_P, qf_L, qf_U = qf_lu_decomposition(qf_M, qf_len, qf_ints, trueDivision)    
 
     # break the resulting QFloats into arrays:
     qf_inv_arrays_L = qfloat_matrix_to_arraysNsigns(qf_L, qf_len, qf_ints, qf_base)    
@@ -487,7 +516,7 @@ def qf_lu_U(qf_arrays, qf_signs, params):
     """
     compute only PLU and returns U
     """
-    [n, qf_len, qf_ints, qf_base] = params
+    [n, qf_len, qf_ints, qf_base, trueDivision] = params
 
     assert( n*n == qf_arrays.shape[0])
     assert( qf_len == qf_arrays.shape[1])
@@ -496,7 +525,7 @@ def qf_lu_U(qf_arrays, qf_signs, params):
     qf_M = qfloat_arrays_to_QFloat_matrix(qf_arrays, qf_signs, qf_ints, qf_base)
 
     # compute the LU decomposition
-    bin_P, qf_L, qf_U = qf_lu_decomposition(qf_M, qf_len, qf_ints)    
+    bin_P, qf_L, qf_U = qf_lu_decomposition(qf_M, qf_len, qf_ints, trueDivision)    
 
     # break the resulting QFloats into arrays:
     #qf_inv_arrays_L = qfloat_matrix_to_arraysNsigns(qf_L, qf_len, qf_ints, qf_base)    
@@ -510,7 +539,7 @@ def qf_matrix_inverse(qf_arrays, qf_signs, params):
     """
     Compute the whole inverse
     """
-    [n, qf_len, qf_ints, qf_base] = params
+    [n, qf_len, qf_ints, qf_base, trueDivision] = params
 
     assert( n*n == qf_arrays.shape[0])
     assert( qf_len == qf_arrays.shape[1])
@@ -524,10 +553,10 @@ def qf_matrix_inverse(qf_arrays, qf_signs, params):
 
     else:
         # compute the LU decomposition
-        bin_P, qf_L, qf_U = qf_lu_decomposition(qf_M, qf_len, qf_ints)
+        bin_P, qf_L, qf_U = qf_lu_decomposition(qf_M, qf_len, qf_ints, trueDivision)
 
         # compute inverse from P L U
-        qf_Minv = qf_lu_inverse(bin_P, qf_L, qf_U, qf_len, qf_ints)
+        qf_Minv = qf_lu_inverse(bin_P, qf_L, qf_U, qf_len, qf_ints, trueDivision)
 
     # break the resulting QFloats into arrays:
     qf_inv_arrays = qfloat_matrix_to_arraysNsigns(qf_Minv, qf_len, qf_ints, qf_base)
@@ -546,6 +575,8 @@ def qf_matrix_inverse(qf_arrays, qf_signs, params):
                         #    ██    █████   ███████    ██    ███████ 
                         #    ██    ██           ██    ██         ██ 
                         #    ██    ███████ ███████    ██    ███████ 
+
+# tests for functions in this file. The above the functions can be imported from another file
 
 #############################################################################################################
 
@@ -566,14 +597,11 @@ def measure_time(function, descripton, *inputs):
 #                                    PYTHON
 ########################################################################################
 
-def test_qf_PLU_python(sampler, params):
+def test_qf_PLU_python(M, params):
     """
-    Test the PLU decomposition using QFloats, in python
+    Test the LU decomposition using QFloats, in python
     """
-    # gen random matrix
-    M = sampler()
-
-    [n, qf_len, qf_ints, qf_base] = params
+    [n, qf_len, qf_ints, qf_base, trueDivision] = params
 
     # convert it to QFloat arrays
     qf_arrays, qf_signs = float_matrix_to_qfloat_arrays(M, qf_len, qf_ints, qf_base)
@@ -582,7 +610,7 @@ def test_qf_PLU_python(sampler, params):
     qf_M = qfloat_arrays_to_QFloat_matrix(qf_arrays, qf_signs, qf_ints, qf_base)
 
     # compute the LU decomposition
-    bin_P, qf_L, qf_U = qf_lu_decomposition(qf_M, qf_len, qf_ints)
+    bin_P, qf_L, qf_U = qf_lu_decomposition(qf_M, qf_len, qf_ints, trueDivision)
 
     # convert bin_P from binaryValue to floats
     P = np.array( map_2D_list(bin_P, lambda x: x.value) )
@@ -634,14 +662,11 @@ def run_qf_inverse_python(M, qf_len, qf_ints, qf_base):
     return qf_Res
 
 
-def test_qf_inverse_python(sampler, params):
+def test_qf_inverse_python(M, params):
     """
     Test the matrix inverse using QFloats, in python
     """
-    # gen random matrix
-    M = sampler()
-
-    [n, qf_len, qf_ints, qf_base] = params
+    [n, qf_len, qf_ints, qf_base, trueDivision] = params
 
     # convert it to QFloat arrays
     qf_arrays, qf_signs = float_matrix_to_qfloat_arrays(M, qf_len, qf_ints, qf_base)
@@ -661,23 +686,27 @@ def test_qf_inverse_python(sampler, params):
     scres=sc.linalg.inv(M)
     print(scres)
 
-    print('\nError :')
-    print(np.mean(np.abs(qf_Res - scres)))
+    error = np.abs(qf_Res - scres)
+    print(f"\nAverage Error: {np.mean(error):.6f}")
+    print(f"    Max Error: {np.max(error):.6f}")
+    print(f"    Min Error: {np.min(error):.6f}")
+    print(f"  Total Error: {np.sum(error):.6f}")    
 
     print(f"\n|  Took : {end-start:.4f} s  |\n") 
 
 
-def debug_qf_inverse_python(sampler, params, N=100):
+def debug_qf_inverse_python(sampler, params, verbose=False, N=100):
     """
     Debug the algorithm to look for big errors
     """
     errors = np.zeros(N)
+    nerrors=0
     for i in range(N):
         #print(i)
         # gen random matrix
         M = sampler()
 
-        [n, qf_len, qf_ints, qf_base] = params
+        [n, qf_len, qf_ints, qf_base, trueDivision] = params
 
         # convert it to QFloat arrays
         qf_arrays, qf_signs = float_matrix_to_qfloat_arrays(M, qf_len, qf_ints, qf_base)
@@ -691,16 +720,25 @@ def debug_qf_inverse_python(sampler, params, N=100):
         errors[i] = error
 
         if error > 1:
-            print(error)
+            nerrors+=1
+
+            if not verbose:
+                continue
+
+            err = np.abs(qf_Res - scres)
+            print(f"\nAverage Error: {np.mean(err):.6f}")
+            print(f"    Max Error: {np.max(err):.6f}")
+            print(f"    Min Error: {np.min(err):.6f}")
+            print(f"  Total Error: {np.sum(err):.6f}")   
 
             # reconstruct the matrix of QFloats 
             qf_M = qfloat_arrays_to_QFloat_matrix(qf_arrays, qf_signs, qf_ints, qf_base)
 
             # compute the LU decomposition
-            bin_P, qf_L, qf_U = qf_lu_decomposition(qf_M, qf_len, qf_ints)
+            bin_P, qf_L, qf_U = qf_lu_decomposition(qf_M, qf_len, qf_ints, trueDivision)
 
             # compute the inverse
-            qf_Minv, qf_Y, qf_X = qf_lu_inverse(bin_P, qf_L, qf_U, qf_len, qf_ints, debug=True)
+            qf_Minv, qf_Y, qf_X = qf_lu_inverse(bin_P, qf_L, qf_U, qf_len, qf_ints, trueDivision, debug=True)
 
             # convert QFloat mattrices to floats
             L = map_2D_list(qf_L, lambda x: x.toFloat())
@@ -730,6 +768,7 @@ def debug_qf_inverse_python(sampler, params, N=100):
             print(Y_)
 
     print('mean error :', np.mean(errors) )
+    print('big error rate :' + str(100*nerrors/N) + ' %')
 
 
 
@@ -741,7 +780,7 @@ def debug_qf_inverse_python(sampler, params, N=100):
 
 def compile_circuit(params, sampler, circuit_function):
 
-    [n, qf_len, qf_ints, qf_base, _, _] = params
+    [n, qf_len, qf_ints, qf_base, trueDivision] = params
 
     inputset=[]
     for i in range(100):
@@ -784,9 +823,8 @@ def run_qf_circuit_fhe(circuit, M, qf_len, qf_ints, qf_base, simulate=False, raw
     return qfloatNsigns_arrays_to_float_matrix(decrypted, qf_ints, qf_base)
 
 
-def test_qf_pivot_fhe(circuit, sampler, params, simulate=False):
-    M = sampler()
-    [n, qf_len, qf_ints, qf_base] = params
+def test_qf_pivot_fhe(circuit, M, params, simulate=False):
+    [n, qf_len, qf_ints, qf_base, trueDivision] = params
     qf_Res = run_qf_circuit_fhe(circuit, M, qf_len, qf_ints, qf_base, simulate, True)
     if(simulate):
         print('SIMULATING\n')
@@ -799,9 +837,8 @@ def test_qf_pivot_fhe(circuit, sampler, params, simulate=False):
     print(pivot_matrix(M))
     print(' ') 
 
-def test_qf_LU_U_fhe(circuit, sampler, params, simulate=False):
-    M = sampler()
-    [n, qf_len, qf_ints, qf_base] = params
+def test_qf_LU_U_fhe(circuit, M, params, simulate=False):
+    [n, qf_len, qf_ints, qf_base, trueDivision] = params
     qf_Res = run_qf_circuit_fhe(circuit, M, qf_len, qf_ints, qf_base, simulate)
     
     if(simulate):
@@ -817,9 +854,8 @@ def test_qf_LU_U_fhe(circuit, sampler, params, simulate=False):
     print(' ') 
 
 
-def test_qf_LU_L_fhe(circuit, sampler, params, simulate=False):
-    M = sampler()
-    [n, qf_len, qf_ints, qf_base] = params
+def test_qf_LU_L_fhe(circuit, M, params, simulate=False):
+    [n, qf_len, qf_ints, qf_base, trueDivision] = params
     qf_Res = run_qf_circuit_fhe(circuit, M, qf_len, qf_ints, qf_base, simulate)
     if(simulate):
         print('SIMULATING')
@@ -834,10 +870,9 @@ def test_qf_LU_L_fhe(circuit, sampler, params, simulate=False):
     print(' ') 
 
 
-def test_qf_inverse_fhe(circuit, sampler, params):
-    M = sampler()
+def test_qf_inverse_fhe(circuit, M, params):
 
-    [n, qf_len, qf_ints, qf_base] = params
+    [n, qf_len, qf_ints, qf_base, trueDivision] = params
 
     print('\nScipy inv :')
     scres = sc.linalg.inv(M)
@@ -858,18 +893,34 @@ def test_qf_inverse_fhe(circuit, sampler, params):
     print(qf_Res)
     print(' ')
 
-    print('\nError :')
-    print(np.mean(np.abs(qf_Res - scres)))    
+    error = np.abs(qf_Res - scres)
+    print(f"\nAverage Error: {np.mean(error):.6f}")
+    print(f"    Max Error: {np.max(error):.6f}")
+    print(f"    Min Error: {np.min(error):.6f}")
+    print(f"  Total Error: {np.sum(error):.6f}")   
 
 
 if __name__ == '__main__':
 
+    #n=2; qf_base = 2; qf_len = 23; qf_ints = 9;
     #n=2; qf_base = 2; qf_len = 44; qf_ints = 14;
-    #n=2;  qf_base = 16; qf_len = 5; qf_ints = 3; qf_len_out=4; qf_ints_out = 0;
-    #n=2;  qf_base = 32; qf_len = 5; qf_ints = 2; qf_len_out=4; qf_ints_out = 0;
+    #n=2;  qf_base = 16; qf_len = 5; qf_ints = 3; # CONCRETE BUG
+    #n=2;  qf_base = 32; qf_len = 5; qf_ints = 2; # CONCRETE BUG
 
-    n=3; qf_base = 2; qf_len = 43; qf_ints = 13;
-    #n=3; qf_base = 16; qf_len = 5; qf_ints = 3; qf_len_out=7; qf_ints_out = 3;
+    # low precision
+    trueDivision = False
+    n=3; qf_base = 2; qf_len = 23; qf_ints = 9;
+    #n=5; qf_base = 2; qf_len = 23; qf_ints = 9;
+
+    # intermediate precision
+    trueDivision = False
+    # n=3; qf_base = 2; qf_len = 31; qf_ints = 16;
+    # n=4; qf_base = 2; qf_len = 31; qf_ints = 16;
+    #n=3; qf_base = 16; qf_len = 5; qf_ints = 3; # CONCRETE BUG
+
+    # higher precision
+    # trueDivision = True
+    # n=3; qf_base = 2; qf_len = 31; qf_ints = 16;
 
     normal_sampler = ("Normal", lambda: np.random.randn(n, n) * 100)
     uniform_sampler = ("Uniform", lambda: np.random.uniform(0, 100, (n, n)))
@@ -877,10 +928,17 @@ if __name__ == '__main__':
     sampler = normal_sampler[1]
     #sampler = uniform_sampler[1]
 
-    params = [n, qf_len, qf_ints, qf_base]
+    # gen random matrix
+    M = sampler()
+
+    print('Test for Matrix :\n==================')
+    print(M)
+    print('')   
+
+    params = [n, qf_len, qf_ints, qf_base, trueDivision]
 
     # debug
-    #debug_qf_inverse_python(sampler, params, 1000)
+    #debug_qf_inverse_python(sampler, params, verbose=False, N=1000)
 
     # test PLU qf python
     # ----------------------
@@ -889,7 +947,7 @@ if __name__ == '__main__':
     # test inverse qf python
     # ----------------------
     QFloat.resetStats()
-    test_qf_inverse_python(sampler, params)
+    test_qf_inverse_python(M, params)
     QFloat.showStats()
 
     # test pivot in fhe:
@@ -897,26 +955,26 @@ if __name__ == '__main__':
     # QFloat.resetStats()
     # circuit = compile_circuit(params, sampler, qf_pivot)
     # QFloat.showStats()
-    # test_qf_pivot_fhe(circuit, sampler, params, False)
+    # test_qf_pivot_fhe(circuit, M, params, False)
 
     # test LU U decomposition in fhe:
     # -----------------------------
     # QFloat.resetStats()
     # circuit = compile_circuit(params, sampler, qf_lu_U)
     # QFloat.showStats()
-    # test_qf_LU_U_fhe(circuit, sampler, params, False)
+    # test_qf_LU_U_fhe(circuit, M, params, False)
 
     # test LU L decomposition in fhe:
     # -----------------------------
     # QFloat.resetStats()
     # circuit = compile_circuit(params, sampler, qf_lu_L)
     # QFloat.showStats()
-    # test_qf_LU_L_fhe(circuit, params, simulate=True)    
+    # test_qf_LU_L_fhe(circuit, M, params, simulate=True)    
 
     # test inversion in fhe:
     # -----------------------------
-    # QFloat.resetStats()
-    # circuit = compile_circuit(params, sampler, qf_matrix_inverse)
-    # QFloat.showStats()
-    # test_qf_inverse_fhe(circuit, sampler, params)
+    QFloat.resetStats()
+    circuit = compile_circuit(params, sampler, qf_matrix_inverse)
+    QFloat.showStats()
+    test_qf_inverse_fhe(circuit, M, params)
 

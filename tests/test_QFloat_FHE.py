@@ -1,3 +1,7 @@
+"""
+Testing the QFloats in FHE
+"""
+
 import sys, os, time
 
 import unittest
@@ -318,9 +322,9 @@ class TestQFloat(unittest.TestCase):
 
 
 
-#unittest.main()
+unittest.main()
 
 #suite = unittest.TestLoader().loadTestsFromName('test_QFloat_FHE.TestQFloat.test_add_sub_fhe')
 #suite = unittest.TestLoader().loadTestsFromName('test_QFloat_FHE.TestQFloat.test_div_fhe')
-suite = unittest.TestLoader().loadTestsFromName('test_QFloat_FHE.TestQFloat.test_mul_fhe')
-unittest.TextTestRunner(verbosity=1).run(suite)
+#suite = unittest.TestLoader().loadTestsFromName('test_QFloat_FHE.TestQFloat.test_mul_fhe')
+#unittest.TextTestRunner(verbosity=1).run(suite)
