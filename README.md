@@ -36,6 +36,8 @@ This representation allows to make any operations on the QFloats in FHE, but has
 
 - Along with the **QFloat** class, the **SignedBinary** and **Zero** classes can be used to limit the computations when we know values are binary numbers or are equal to zero. They are compatible with QFloats.
 
+- QFloats where designed for the matrix inversion problem but can be used for (almost) any other float computations in FHE !
+
 
 ### Why using QFloats is required for matrix inversion
 - To compute the inverse of a float matrix in FHE, one must inevitably run computations on representations of floats in FHE, with a data structure keeping a minimal precision of the initial floats which are 32 to 64 bits. Hence, a class like **QFloat** is absolutely required here, with enough precision provided.
