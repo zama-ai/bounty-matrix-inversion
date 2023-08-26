@@ -900,6 +900,9 @@ def test_qf_inverse_fhe(circuit, M, params):
     print(f"  Total Error: {np.sum(error):.6f}")   
 
 
+
+# TODO: test with higher bases and smaller arrays (should be faster to compile and run, slower to encrypt), currently their is a bug in concrete.
+
 if __name__ == '__main__':
 
     #n=2; qf_base = 2; qf_len = 23; qf_ints = 9;
