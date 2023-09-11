@@ -1,229 +1,14 @@
 """
-This module implements the QFloat object which allows to quantize floating point values in FHE
-author : Lcressot 
+This module implements the QFloat class that allows to quantize floating point values in FHE
+author : Lcressot
 """
 
 import numpy as np
 import numbers
 from concrete import fhe
+import base_p_arrays as bpa
 
 Tracer = fhe.tracing.tracer.Tracer
-
-# =======================================================================================================================
-#                            Functions operating on arrays in base p (p=2 means binary)
-# =======================================================================================================================
-
-
-def base_p_to_int(arr, p):
-    """
-    Convert base p array to int
-    Can be signed (+/- values)
-    """
-    # Flip the array to have least significant digit at the start
-    arr = np.flip(arr)
-    # Compute the place values (p^0, p^1, p^2, ...)
-    place_values = p ** np.arange(arr.size)
-    # Return the sum of arr*place_value
-    return np.sum(arr * place_values)
-
-
-def int_to_base_p(integer, n, p):
-    """
-    Convert an integer into base-p array
-    Can be signed (+/- values)
-    """
-    if n == 0:
-        return np.array([], dtype=int)
-
-    sgn = int(np.sign(integer))
-    integer = int(np.abs(integer))
-
-    if not isinstance(integer, int) or not isinstance(n, int) or not isinstance(p, int):
-        raise ValueError("All inputs must be integers")
-    if integer < 0 or n <= 0 or p <= 1:
-        raise ValueError("Invalid input values")
-
-    result = np.zeros(n, dtype=int)
-
-    for i in reversed(range(n)):
-        power = pow(p, i)
-        div = integer // power
-        integer -= div * power
-        result[n - 1 - i] = div
-
-    return result * sgn
-
-
-def base_p_to_float(arr, p):
-    """
-    Convert a base-p array to a float of the form 0.xxx..
-    Can be signed (+/- values)
-    """
-    f = 0.0
-    for i in range(len(arr)):
-        f += arr[i] * (p ** -(i + 1))
-    return f
-
-
-def float_to_base_p(f, precision, p):
-    """
-    Convert a float of type 0.xxx.. to a base-p array with a given precision.
-    Can be signed (+/- values)
-    """
-    sgn = np.sign(f)
-    f = np.abs(f)
-    assert 0 <= f < 1, "Input should be a float between 0 and 1 (exclusive)"
-    basep = []
-    while f and len(basep) < precision:
-        f *= p
-        digit = int(f)
-        if digit > 0:
-            f -= digit
-            basep.append(digit)
-        else:
-            basep.append(0)
-    while len(basep) < precision:
-        basep.append(0)
-    return sgn * np.array(basep)
-
-
-def base_p_addition(a, b, p, inplace=False):
-    """
-    Add arrays in base p. (a and b must be positive and tidy)
-    If a and b have different sizes, the longer array is considered to have extra zeros to the left
-    if inplace is True, the result is written is a
-    """
-    carry = 0
-    if inplace:
-        result = a
-    else:
-        result = fhe.zeros(a.size)
-
-    # Loop through both arrays and perform binary addition
-    for i in range(min(a.size, b.size)):
-        bit_sum = a[-i - 1] + b[-i - 1] + carry
-        result[-i - 1] = bit_sum % 2
-        carry = bit_sum // 2
-
-    return result
-
-
-def base_p_subtraction_overflow(a, b, p):
-    """
-    Subtract arrays in base p. (a and b must be tidy)
-    If a and b have different sizes, the longer array is considered to have extra zeros to the left
-    If a < b, the result is wrong and full of ones on the left part, so we can return in addition wether a < b
-    """
-    difference = fhe.zeros(a.size)
-    borrow = 0
-    for i in range(min(a.size, b.size)):
-        # Perform subtraction for each bit
-        temp = a[-i - 1] - b[-i - 1] - borrow
-        borrow = temp < 0
-        difference[-i - 1] = temp + p * borrow
-    return difference, borrow
-
-
-def base_p_subtraction(a, b, p):
-    """
-    Subtract arrays in base p. (a and b must be tidy, postive with a >= b)
-    Also, if they have different sizes, the longer array is considered to have extra zeros to the left
-    """
-    return base_p_subtraction_overflow(a, b, p)[0]
-
-
-def base_p_division(dividend, divisor, p):
-    """
-    Divide arrays in base p. (dividend and divisor must be tidy and positive)
-    """
-    # Initialize the quotient array
-    quotient = fhe.zeros(dividend.size)
-    # Initialize the remainder
-    remainder = dividend[0].reshape(1)
-
-    for i in range(dividend.size):
-        if i > 0:
-            # Left-roll the remainder and bring down the next bit from the dividend
-            # also cut remainder if its size is bigger than divisor's, cause there are extra zeros
-            d = 1 * (remainder.size > divisor.size)
-            remainder = np.concatenate((remainder[d:], dividend[i].reshape(1)), axis=0)
-        # If the remainder is larger than or equal to the divisor
-        for j in range(p - 1):
-            is_ge = is_greater_or_equal_base_p(remainder, divisor)
-            # Subtract the divisor from the remainder
-            remainder = (
-                is_ge * base_p_subtraction(remainder, divisor, p)
-                + (1 - is_ge) * remainder
-            )
-            # Set the current quotient bit to 1
-            quotient[i] += is_ge
-
-    return quotient
-
-
-def is_greater_or_equal(a, b):
-    """
-    Fast computation of wether an array number a is greater or equal to an array number b
-    Both arrays must be base tidy, in which case the subtraction of a-b will work if a>=b and overflow if a<b
-    The overflow is a fast way to compute wether a>=b <=> not a<b
-    """
-    borrow = 0
-    for i in range(min(a.size, b.size)):
-        # report borrow
-        borrow = a[-i - 1] - b[-i - 1] - borrow < 0
-    return 1 - borrow
-
-
-def is_equal(a, b):
-    """
-    Computes wether an array is equal to another
-    """
-    return (a.size - np.sum(a == b)) == 0
-
-
-def is_positive(a):
-    """
-    Fast computation of wether an array number a is positive (or zero)
-    a must be base tidy (returns the first non zero sign)
-    """
-    borrow = 0
-    for i in range(a.size):
-        # report borrow
-        borrow = a[-i - 1] - borrow < 0
-    return 1 - borrow
-
-
-def is_greater_or_equal_base_p(a, b):
-    """
-    Computes wether a base-p number (little endian) is greater or equal than another, works for different sizes
-    """
-    diff = b.size - a.size
-    if diff == 0:
-        return is_greater_or_equal(a, b)
-    elif diff > 0:
-        return is_greater_or_equal(a, b[diff:]) & (np.sum(b[0:diff]) == 0)
-    else:
-        return is_greater_or_equal(a[-diff:], b) | (np.sum(a[0:-diff]) > 0)
-
-
-def insert_array_at_index(a, B, i, j):
-    """
-    Insert elements of array a into array B[i,:] starting at index j
-    """
-    # Case when i is negative
-    if j < 0:
-        # We will take elements of a starting at index -j
-        a = a[-j:]
-        j = 0
-    # Compute the number of elements we can insert from a into b
-    n = min(B[i].size - j, a.size)
-    # Insert elements from a into B[i]
-    B[i, j : j + n] = a[:n]
-
-
-# =======================================================================================================================
-#                                                       Zero
-# =======================================================================================================================
 
 
 class Zero:
@@ -232,58 +17,106 @@ class Zero:
     It is usefull to save computations for operations with QFloats
     """
 
-    def __init__(self):
-        pass
-
     def copy(self):
-        return Zero()
+        """
+        Copy the object
+        This is is the same as returning itself
+        """
+        return self
 
-    def toFloat(self):
+    def to_float(self):
+        """
+        Convert to an unencrypted float
+        """
         return float(0)
 
     def __add__(self, other):
+        """
+        Add a Zero to an object
+        This does not affect the object
+        """
         if isinstance(other, Zero):
             return self
-        else:
-            return other
+
+        return other
 
     def __radd__(self, other):
+        """
+        Add a Zero to an object (from the right)
+        This does not affect the object
+        """
         if isinstance(other, Zero):
             return self
-        else:
-            return other
+
+        return other
 
     def __sub__(self, other):
+        """
+        Subtract an object from a Zero
+        This returns the negative of the object
+        """
         if isinstance(other, Zero):
             return self
-        else:
-            return -other
+
+        return -other
 
     def __rsub__(self, other):
+        """
+        Subtract a Zero from an object
+        This does not affect the object
+        """
         return other
 
     def __mul__(self, other):
+        """
+        Multiply with a Zero
+        This gives a Zero
+        """
         return self
 
     def __rmul__(self, other):
+        """
+        Multiply with a Zero (from the right)
+        This gives a Zero
+        """
         return self
 
     def __truediv__(self, other):
+        """
+        Division of a Zero by another object
+        This gives a Zero, or an error if the other object is a Zero as well
+        """
+        if isinstance(other, Zero):
+            raise ValueError("division by Zero")
+
         return self
 
     def __rtruediv__(self, other):
-        raise Exception("division by Zero")
+        """
+        Division of an object by a Zero
+        This raises an error
+        """
+        raise ValueError("division by Zero")
 
     def __neg__(self):
+        """
+        Return the negative of a Zero which is itself
+        """
         return self
 
     def neg(self):
+        """
+        Change the sign in place which makes no change
+        """
+        return self
+
+    def __abs__(self):
+        """
+        Return a copy of the object with positive sign, which does not change it
+        """
         return self
 
 
-# =======================================================================================================================
-#                                                       SignedBinary
-# =======================================================================================================================
 
 
 class SignedBinary:
@@ -294,75 +127,123 @@ class SignedBinary:
     """
 
     def __init__(self, value):
+        """
+        Initialize with a signed binary value
+        """
         # init with a signed binary value (+1, -1 or 0)
         self._value = value
         self._encrypted = isinstance(value, Tracer)
 
     @property
     def value(self):
+        """
+        Getter of value
+        """
         return self._value
 
     @value.setter
     def value(self, newvalue):
+        """
+        Setter of value
+        """
         self._value = newvalue
         self._encrypted = isinstance(newvalue, Tracer)
 
+    @property
+    def encrypted(self):
+        """
+        Getter of encrypted
+        """
+        return self._encrypted
+
+    @encrypted.setter
+    def encrypted(self, newencrypted):
+        """
+        Setter of encrypted
+        """
+        raise ValueError('Setting this variables from outside is forbidden')
+
     def copy(self):
+        """
+        Copy the object
+        """
         return SignedBinary(self._value)
 
-    def toFloat(self):
+    def to_float(self):
+        """
+        Convert object to an unencrypted float
+        Cannot be called in FHE with an encrypted value
+        """
         return float(self._value)
 
     def __add__(self, other):
+        """
+        Add an object (Zero, SignedBinary or QFloat)
+        """
         if isinstance(other, SignedBinary):
             # potentially no more a binary
             return self._value + other._value
-        elif isinstance(other, QFloat):
+        if isinstance(other, QFloat):
             return other.__add__(self)
-        else:
-            return self._value + other
+
+        return self._value + other
 
     def __sub__(self, other):
+        """
+        Subtract an object (Zero, SignedBinary or QFloat)
+        """
         if isinstance(other, SignedBinary):
             # potentially no more a binary
             return self._value - other._value
-        elif isinstance(other, QFloat):
+        if isinstance(other, QFloat):
             return other.__rsub__(self)
-        else:
-            return self._value - other
+
+        return self._value - other
 
     def __mul__(self, other):
+        """
+        Multiply with an object (Zero, SignedBinary or QFloat)
+        """
         if isinstance(other, SignedBinary):
             # stays binary
             return SignedBinary(self._value * other._value)
-        elif isinstance(other, QFloat):
+        if isinstance(other, QFloat):
             return other.__mul__(self)
-        else:
-            return self._value * other
+
+        return self._value * other
 
     def __truediv__(self, other):
+        """
+        Divide by an object (Zero, SignedBinary or QFloat)
+        """
         if isinstance(other, SignedBinary):
             # stays binary
             return SignedBinary(self._value // other._value)
-        elif isinstance(other, QFloat):
+        if isinstance(other, QFloat):
             return other.__rtruediv__(self)
-        else:
-            return self._value / other
+
+        return self._value / other
 
     def __neg__(self):
+        """
+        Return an new object with opposite sign
+        """
         return SignedBinary(-1 * self._value)
 
     def neg(self):
+        """
+        Change the sign in place
+        """
         self._value *= -1
         return self
 
     def __abs__(self):
+        """
+        Return a copy of the object with positive sign
+        """
         return SignedBinary(np.abs(self._value))
 
 
-# =======================================================================================================================
-#                                                       QFfloats
-# =======================================================================================================================
 
 
 class QFloat:
@@ -372,10 +253,12 @@ class QFloat:
     Encrypted QFloat can be summed, multiplied etc. with unencrypted QFloats, and vice-versa
 
     TODO:
-    - allow operations (see fromMul) between QFloats of different lengths to optimize algorithms
-    - replace length + ints with length + dot position where dot position can be negative to encode efficiently
-    for very low numbers. For isntance: 0.000000001110 encoded as -.--------1110 with dot position = -8
-    - keep track of overflow (in tidy, set QFloat.overflow = dividend) then decrypt this value to know if the computation failed
+    - allow operations (see from_mul) between QFloats of different lengths to optimize algorithms
+    - replace length + ints with length + dot position where dot position can be
+    negative to encode efficiently for very low numbers.
+    For isntance: 0.000000001110 encoded as -.--------1110 with dot position = -8
+    - keep track of overflow (in tidy, set QFloat.overflow = dividend),
+    then decrypt this value to know if the computation failed
     - do not compute tidying on the floating part when adding an integer or SignedBinary in iadd
 
     """
@@ -385,11 +268,12 @@ class QFloat:
     MULTIPLICATION = 0
     DIVISION = 0
 
-    def __init__(self, array, ints=None, base=2, isBaseTidy=True, sign=1):
+    def __init__(self, array, ints=None, base=2, is_base_tidy=True, sign=1):
         """
         - array: an encrypted or unencrypted array representing a number in base p (little endian)
-        - ints: gives the number of digits before the dot, so ints = 1 will encode a number like x.xxxx...
-        - isBaseTidy: wether the array is already basetidy
+        - ints: gives the number of digits before the dot,
+            so ints = 1 will encode a number like x.xxxx...
+        - is_base_tidy: wether the array is already basetidy
         - sign: provide the sign: 1 or -1
         """
         if not (isinstance(array, np.ndarray) or isinstance(array, Tracer)):
@@ -420,61 +304,69 @@ class QFloat:
         if isinstance(self._sign, float):
             self._sign = int(self._sign)
 
-        self._isBaseTidy = isBaseTidy
-        if not self._isBaseTidy:
-            self.baseTidy()
+        self._is_base_tidy = is_base_tidy
+        if not self._is_base_tidy:
+            self.base_tidy()
 
-    def resetStats():
-        QFloat.ADDITIONS = 0
-        QFloat.MULTIPLICATION = 0
-        QFloat.DIVISION = 0
+    @classmethod
+    def reset_stats(cls):
+        """
+        Reset the class statitics
+        """
+        cls.ADDITIONS = 0
+        cls.MULTIPLICATION = 0
+        cls.DIVISION = 0
 
-    def showStats():
+    @classmethod
+    def show_stats(cls):
+        """
+        Display the class statitics
+        """
         print("\nQFloat statistics :")
         print("======================")
-        print("Additions       : " + str(QFloat.ADDITIONS))
-        print("Multiplications : " + str(QFloat.MULTIPLICATION))
-        print("Divisions       : " + str(QFloat.DIVISION))
+        print("Additions       : " + str(cls.ADDITIONS))
+        print("Multiplications : " + str(cls.MULTIPLICATION))
+        print("Divisions       : " + str(cls.DIVISION))
         print("\n")
 
-    def _checkUnencrypted(self):
+    def _check_unencrypted(self):
         if self._encrypted:
-            raise Exception("This function does not work on encrypted QFloats")
+            raise ValueError("This function does not work on encrypted QFloats")
 
-    # =============================================================================================
+    # ======================================================================================
     #                        Functions for unencrypted QFloats only
-    # =============================================================================================
+    # ======================================================================================
 
-    def toStr(self, tidy=True):
+    def to_str(self, tidy=True):
         """
         Convert the QFloat to a string
 
         WARNING : does not work on encrypted QFLoat
         """
-        self._checkUnencrypted()
+        self._check_unencrypted()
 
         if tidy:  # tidy before return the representation
-            self.baseTidy()
+            self.base_tidy()
 
-        sgn = self.getSign()
+        sgn = self.sign
 
-        integerPart = (self._array[0 : self._ints] * (sgn != 0)).astype(
+        integer_part = (self._array[0 : self._ints] * (sgn != 0)).astype(
             "int"
         )  # 0 is sign is 0
-        floatPart = (self._array[self._ints :] * (sgn != 0)).astype(
+        float_part = (self._array[self._ints :] * (sgn != 0)).astype(
             "int"
         )  # 0 is sign is 0
 
         if self._base <= 10:
-            integerPart = "".join([str(i) for i in integerPart])
-            floatPart = "".join([str(i) for i in floatPart])
+            integer_part = "".join([str(i) for i in integer_part])
+            float_part = "".join([str(i) for i in float_part])
         else:
-            integerPart = str(integerPart)
-            floatPart = str(floatPart)
+            integer_part = str(integer_part)
+            float_part = str(float_part)
 
         sgnstr = "" if sgn >= 0 else "-"
 
-        return sgnstr + integerPart + "." + floatPart
+        return sgnstr + integer_part + "." + float_part
 
     def __str__(self):
         """
@@ -482,9 +374,10 @@ class QFloat:
 
         WARNING : does not work on encrypted QFLoat
         """
-        return self.toStr(True)
+        return self.to_str(True)
 
-    def fromFloat(f, length=10, ints=None, base=2):
+    @classmethod
+    def from_float(cls, f, length=10, ints=None, base=2):
         """
         Create a QFloat from an unencrypted float
 
@@ -493,90 +386,164 @@ class QFloat:
         if ints is None:
             ints = length // 2
 
-        integerPart = int(f)
-        floatPart = f - integerPart
+        integer_part = int(f)
+        float_part = f - integer_part
 
-        intArray = int_to_base_p(integerPart, ints, base)
-        floatArray = float_to_base_p(floatPart, length - ints, base)
+        int_array = bpa.int_to_base_p(integer_part, ints, base)
+        float_array = bpa.float_to_base_p(float_part, length - ints, base)
 
         array = fhe.zeros(length)
-        array[0:ints] = intArray
-        array[ints:] = floatArray
+        array[0:ints] = int_array
+        array[ints:] = float_array
         sign = np.sign(f) or 1  # zero has sign 1
 
         # set with abs value of array
-        return QFloat(np.abs(array), ints, base, True, sign)
+        return cls(np.abs(array), ints, base, True, sign)
 
-    def toFloat(self):
+    def to_float(self):
         """
         Create an unencrypted float from the QFloat
 
         WARNING : does not work on encrypted QFLoat
         """
-        self._checkUnencrypted()
+        self._check_unencrypted()
 
-        integerPart = base_p_to_int(self._array[0 : self._ints], self._base)
-        floatPart = base_p_to_float(self._array[self._ints :], self._base)
+        integer_part = bpa.base_p_to_int(self._array[0 : self._ints], self._base)
+        float_part = bpa.base_p_to_float(self._array[self._ints :], self._base)
 
-        return (integerPart + floatPart) * self._sign  # will yield a 0 if sign is 0
+        return (integer_part + float_part) * self._sign  # will yield a 0 if sign is 0
 
-    # =============================================================================================
+    # ======================================================================================
     #                      Functions for both encrypted or unencrypted QFloats
     #
     #       Functions with (self,other) can work for mixed encrypted and unencrypted arrays
-    # =============================================================================================
+    # ======================================================================================
 
-    def zero(length, ints, base, encrypted=True):
+    @property
+    def ints(self):
+        """
+        Getter of ints
+        """
+        return self._ints
+
+    @ints.setter
+    def ints(self, newints):
+        """
+        Setter of ints
+        """
+        raise ValueError('Setting this variables from outside is forbidden')
+
+    @property
+    def base(self):
+        """
+        Getter of base
+        """
+        return self._base
+
+    @base.setter
+    def base(self, newbase):
+        """
+        Setter of base
+        """
+        raise ValueError('Setting this variables from outside is forbidden')
+
+    @property
+    def array(self):
+        """
+        Getter of array
+        """
+        return self._array
+
+    @array.setter
+    def array(self, newarray):
+        """
+        Setter of array
+        """
+        raise ValueError('Setting this variables from outside is forbidden')
+
+    @property
+    def encrypted(self):
+        """
+        Getter of encrypted
+        """
+        return self._encrypted
+
+    @encrypted.setter
+    def encrypted(self, newencrypted):
+        """
+        Setter of encrypted
+        """
+        raise ValueError('Setting this variables from outside is forbidden')
+
+    @property
+    def sign(self):
+        """
+        Getter of sign
+        """
+        return self._sign
+
+    @sign.setter
+    def sign(self, newsign):
+        """
+        Setter of sign
+        """
+        raise ValueError('Setting this variables from outside is forbidden')
+
+    @classmethod
+    def zero(cls, length, ints, base, encrypted=True):
         """
         Create a QFloat of 0
         """
         if not (isinstance(length, int) and length > 0):
             raise ValueError("length must be a positive int")
         if encrypted:
-            return QFloat(fhe.zeros(length), ints, base, True, fhe.ones(1)[0])
-        else:
-            return QFloat(np.zeros(length), ints, base, True, 1)
+            return cls(fhe.zeros(length), ints, base, True, fhe.ones(1)[0])
 
-    def zero_like(other):
+        return cls(np.zeros(length), ints, base, True, 1)
+
+    @classmethod
+    def zero_like(cls, other):
         """
         Create a QFloat of 0 with same shape as other
         """
-        if not isinstance(other, QFloat):
+        if not isinstance(other, cls):
             raise ValueError("Object must be a QFloat")
 
-        return QFloat.zero(len(other), other._ints, other._base, other._encrypted)
+        return cls.zero(len(other), other.ints, other.base, other.encrypted)
 
-    def one(length, ints, base, encrypted=True):
+    @classmethod
+    def one(cls, length, ints, base, encrypted=True):
         """
         Create a QFloat of 1
         """
         if encrypted:
             array = fhe.zeros(length)
             array[ints - 1] = fhe.ones(1)[0]
-            return QFloat(array, ints, base, True, fhe.ones(1)[0])
+            return cls(array, ints, base, True, fhe.ones(1)[0])
         else:
             array = np.zeros(length)
             array[ints - 1] = 1
-            return QFloat(array, ints, base, True, 1)
+            return cls(array, ints, base, True, 1)
 
-    def one_like(other):
+    @classmethod
+    def one_like(cls, other):
         """
         Create a QFloat of 1 with same shape as other
         """
-        if not isinstance(other, QFloat):
+        if not isinstance(other, cls):
             raise ValueError("Object must be a QFloat")
 
-        return QFloat.one(len(other), other._ints, other._base, other._encrypted)
+        return cls.one(len(other), other.ints, other.base, other.encrypted)
 
     def copy(self):
         """
         Create a QFloat copy
         """
         return QFloat(
-            self.toArray(), self._ints, self._base, self._isBaseTidy, self._sign
+            self.to_array(), self._ints, self._base, self._is_base_tidy, self._sign
         )
 
-    def toArray(self):
+    def to_array(self):
         """
         Rerturn copy of array
         """
@@ -611,34 +578,29 @@ class QFloat:
 
         return self
 
-    def checkCompatibility(self, other):
+    def check_compatibility(self, other):
         """
         Check wether other has equal encoding
         """
         if not isinstance(other, QFloat):
             raise ValueError("Object must also be a " + str(QFloat))
 
-        if self._base != other._base:
+        if self._base != other.base:
             raise ValueError(str(QFloat) + "s bases are different")
 
         if len(self) != len(other):
             raise ValueError(str(QFloat) + "s have different length")
 
-        if self._ints != other._ints:
+        if self._ints != other.ints:
             raise ValueError(str(QFloat) + "s have different dot index")
 
-    def getSign(self):
+    def base_tidy(self):
         """
-        Return the sign of the QFloat
-        """
-        return self._sign
-
-    def baseTidy(self):
-        """
-        Tidy array so that values are in range [-(base-1), base-1] as they should be, but signs can be mixed
+        Tidy array so that values are in range [-(base-1), base-1]
+        as they should be, but signs can be mixed
         Keeping arrays untidy when possible saves computation time
         """
-        if self._isBaseTidy:
+        if self._is_base_tidy:
             return
 
         dividend = 0
@@ -651,7 +613,7 @@ class QFloat:
         # TODO: keep track of overflow
         # QFloat.OVERFLOW = dividend
 
-        self._isBaseTidy = True
+        self._is_base_tidy = True
 
     def tidy(self):
         """
@@ -659,8 +621,8 @@ class QFloat:
         """
 
         # first of all, make all values (negative or positive) fall under the base:
-        if not self._isBaseTidy:
-            self.baseTidy()
+        if not self._is_base_tidy:
+            self.base_tidy()
 
         # then, make all value the same sign. To do this, we consider that:
         # - a Qfloat F is the sum of its positive and negative parts: F = P + N
@@ -669,15 +631,15 @@ class QFloat:
         # - if P < |N|, we can use F = -1 * (|N| - P) so the subtraction algorithm works
 
         P = self._array * (self._array >= 0)
-        absN = -1 * (self._array * (self._array < 0))
+        abs_N = -1 * (self._array * (self._array < 0))
 
-        P_minus_absN, isNegative = base_p_subtraction_overflow(P, absN, self._base)
-        isPositiveOr0 = 1 - isNegative
-        self._array = isPositiveOr0 * P_minus_absN + isNegative * base_p_subtraction(
-            absN, P, self._base
+        P_minus_abs_N, is_negative = bpa.base_p_subtraction_overflow(P, abs_N, self._base)
+        is_positive_or_0 = 1 - is_negative
+        self._array = is_positive_or_0 * P_minus_abs_N + is_negative * bpa.base_p_subtraction(
+            abs_N, P, self._base
         )
 
-        self._sign = 2 * isPositiveOr0 - 1
+        self._sign = 2 * is_positive_or_0 - 1
 
     def __len__(self):
         """
@@ -689,12 +651,12 @@ class QFloat:
         """
         Return wether self is identical to other
         """
-        self.checkCompatibility(other)
+        self.check_compatibility(other)
 
-        if not (self._isBaseTidy and other._isBaseTidy):
+        if not (self._is_base_tidy and other._is_base_tidy):
             raise Exception("cannot compare QFloats that are not tidy")
 
-        return is_equal(self._array, other._array) & (self._sign == other._sign)
+        return bpa.is_equal(self._array, other._array) & (self._sign == other._sign)
 
     def __lt__(self, other):
         """Computes wether an array is lower than another
@@ -710,7 +672,8 @@ class QFloat:
 
         The proposition "A <= B" is the converse of "A > B" (see self.__gt__)
 
-        If array have different length, the shorter one is considered to have extra extra -np.inf values
+        If array have different length, the shorter one is considered
+        to have extra extra -np.inf values
         """
         return 1 - (self > other)
 
@@ -719,23 +682,25 @@ class QFloat:
 
         An qfloat A is greater than a qfloat B if and only if:
         - they have different signs and sign(A) > sign(B)
-        - or they have identical signs, are not equal, and (arr(A) > arr(B) and the signs are positive),
-            else (arr(A) < arr(B) and the signs are negative)
+        - or they have identical signs, are not equal,
+          and (arr(A) > arr(B) and the signs are positive),
+          else (arr(A) < arr(B) and the signs are negative)
 
-        If array have different length, the shorter one is considered to have extra extra -np.inf values
+        If array have different length, the shorter one is considered
+        to have extra extra -np.inf values
         """
-        self.checkCompatibility(other)
+        self.check_compatibility(other)
 
-        self.baseTidy()
-        other.baseTidy()
+        self.base_tidy()
+        other.base_tidy()
 
         sgn_eq = self._sign == other._sign
 
-        self_gt_other = 1 - is_greater_or_equal(
+        self_gt_other = 1 - bpa.is_greater_or_equal(
             other._array, self._array
         )  # not b>=a <=> not not a>b  <=> a>b
         inverse = (self._sign < 0) & (
-            1 - is_equal(self._array, other._array)
+            1 - bpa.is_equal(self._array, other._array)
         )  # inverse if negative sign but no equality
 
         return sgn_eq * (self_gt_other ^ inverse) + (1 - sgn_eq) * (
@@ -743,9 +708,12 @@ class QFloat:
         )
 
     def __ge__(self, other):
-        """Computes wether an array is greater or equal than another, in alphabetical order
+        """
+        Computes wether an array is greater or equal than another
+        in alphabetical order
 
-        The proposition "A >= B" is the mathematical converse of "B > A" (see self.__gt__)
+        The proposition "A >= B" is the mathematical converse of
+        "B > A" (see self.__gt__)
         """
         return 1 - (other > self)
 
@@ -778,20 +746,23 @@ class QFloat:
         """
         return self.__add__(other)
 
-    def checkConvertFHE(qf, condition):
+    @classmethod
+    def check_convert_fhe(cls, qfloat, condition):
         """
-        If qf is not encrypted and condition is verified, convert qf array to fhe array
+        If qfloat is not encrypted and condition is verified,
+        convert qfloat array to fhe array
         """
-        if (not qf._encrypted) and condition:
-            fhe_array = fhe.ones(len(qf)) * qf._array
-            qf._array = fhe_array
-            qf._encrypted = True
+        if (not qfloat.encrypted) and condition:
+            fhe_array = fhe.ones(len(qfloat)) * qfloat.array
+            qfloat.array = fhe_array
+            qfloat.encrypted = True
 
-    def selfCheckConvertFHE(self, condition):
+    def self_check_convert_fhe(self, condition):
         """
-        If self is not encrypted and condition is verified, convert self to fhe array
+        If self is not encrypted and condition is verified,
+        convert self to fhe array
         """
-        QFloat.checkConvertFHE(self, condition)
+        QFloat.check_convert_fhe(self, condition)
 
     def __iadd__(self, other):
         """
@@ -809,21 +780,21 @@ class QFloat:
         self._array *= self._sign
 
         if isinstance(other, Tracer) or isinstance(other, numbers.Integral):
-            self.selfCheckConvertFHE(isinstance(other, Tracer))
+            self.self_check_convert_fhe(isinstance(other, Tracer))
             # Add a single integer
             self._array[self._ints - 1] += other
-            # TODO : in this case, we don't need to baseTidy the floating part of the QFloat
+            # TODO : in this case, we don't need to base_tidy the floating part of the QFloat
         elif isinstance(other, SignedBinary):
-            self.selfCheckConvertFHE(other._encrypted)
+            self.self_check_convert_fhe(other.encrypted)
             self._array[self._ints - 1] += other.value
-            # TODO : in this case, we don't need to baseTidy the floating part of the QFloat
+            # TODO : in this case, we don't need to base_tidy the floating part of the QFloat
         else:
-            self.selfCheckConvertFHE(other._encrypted)
+            self.self_check_convert_fhe(other.encrypted)
 
-            self.checkCompatibility(other)
+            self.check_compatibility(other)
             self._array = self._array + other._array * other._sign
 
-        self._isBaseTidy = False
+        self._is_base_tidy = False
         self._sign = None
 
         # tidy the qflloat to make the integers positive and know the sign
@@ -854,16 +825,16 @@ class QFloat:
         WARNING: precision of multiplication does not increase, so it may overflow if not enough
         """
         if isinstance(other, Tracer) or isinstance(other, numbers.Integral):
-            self.selfCheckConvertFHE(isinstance(other, Tracer))
+            self.self_check_convert_fhe(isinstance(other, Tracer))
             # multiply everything by a single integer
             sign = np.sign(other)
             self._array *= other * sign
             self._sign *= sign
-            self._isBaseTidy = False
-            self.baseTidy()
+            self._is_base_tidy = False
+            self.base_tidy()
 
         elif isinstance(other, SignedBinary):
-            self.selfCheckConvertFHE(other._encrypted)
+            self.self_check_convert_fhe(other.encrypted)
             # multiplying by a binary value is the same as multiplying the sign, aka the value
             # if the vale is zero, the sign becomes zero which will yield a zero QFloat
             self._sign *= other.value
@@ -871,12 +842,13 @@ class QFloat:
             QFloat.MULTIPLICATION += 1  # count only multiplications with other Qfloat
             # multiply with another compatible QFloat
 
-            # always base tidy before a multiplication between to QFloats prevent multiplying big bitwidths
-            self.baseTidy()
-            other.baseTidy()
+            # always base tidy before a multiplication between two
+            # QFloats prevent multiplying big bitwidths
+            self.base_tidy()
+            other.base_tidy()
 
-            self.selfCheckConvertFHE(other._encrypted)
-            self.checkCompatibility(other)
+            self.self_check_convert_fhe(other.encrypted)
+            self.check_compatibility(other)
 
             # A QFloat array is made of 2 parts, integer part and float part
             # The multiplication array will be the sum of integer * other + float * other
@@ -898,10 +870,10 @@ class QFloat:
 
             self._sign = self._sign * other._sign
 
-            self._isBaseTidy = False
+            self._is_base_tidy = False
 
             # base tidy to keep bitwidth low
-            self.baseTidy()
+            self.base_tidy()
 
         return self
 
@@ -915,9 +887,9 @@ class QFloat:
 
         multiplication = self.copy()
         if isinstance(other, Tracer) or (
-            isinstance(other, SignedBinary) and other._encrypted
+            isinstance(other, SignedBinary) and other.encrypted
         ):
-            multiplication.selfCheckConvertFHE(
+            multiplication.self_check_convert_fhe(
                 True
             )  # convert to encrypted array if needed
 
@@ -942,44 +914,51 @@ class QFloat:
     def neg(self):
         """
         In place negative
-        Use it for faster subtraction if you don't need to keep the second QFloat: a - b = a + b.neg()
+        Use it for faster subtraction if you don't need
+        to keep the second QFloat: a - b = a + b.neg()
         """
         self._sign *= -1
         return self
 
-    def fromMul(a, b, newlength=None, newints=None):
+    @classmethod
+    def from_mul(cls, a, b, newlength=None, newints=None):
         """
-        Compute the multiplication of QFloats a and b, inside a new QFloat of given length and ints
-        Warning: if the new length and ints are too low, the result might be cropped
+        Compute the multiplication of QFloats a and b,
+        inside a new QFloat of given length and ints
+
+        Warning: if the new length and ints are too low,
+        the result might be cropped
         """
         if newlength is None:
             newlength = len(a) + len(b)
         if newints is None:
-            newints = a._ints + b._ints
+            newints = a.ints + b.ints
 
-        # special case when multiplying by unencrypted 0, the result is an unencrypted 0
+        # special case when multiplying by unencrypted 0,
+        # the result is an unencrypted 0
         if isinstance(a, Zero) or isinstance(b, Zero):
             return Zero()
 
-        elif isinstance(a, SignedBinary) or isinstance(b, SignedBinary):
+        if isinstance(a, SignedBinary) or isinstance(b, SignedBinary):
             if isinstance(a, SignedBinary) and isinstance(b, SignedBinary):
                 return a * b
             # simple multiplication and size setting
             multiplication = a * b
-            multiplication.set_len_ints(newlength, newints)
+            multiplication.set_lenints(newlength, newints)
 
         else:
-            QFloat.MULTIPLICATION += 1  # count only multiplications with other Qfloat
+            cls.MULTIPLICATION += 1  # count only multiplications with other Qfloat
 
-            # always base tidy before a multiplication between to QFloats prevent multiplying big bitwidths
-            a.baseTidy()
-            b.baseTidy()
+            # always base tidy before a multiplication between
+            # two QFloats prevent multiplying big bitwidths
+            a.base_tidy()
+            b.base_tidy()
 
             # convert a to encrypted if needed
-            QFloat.checkConvertFHE(a, b._encrypted)
+            cls.check_convert_fhe(a, b.encrypted)
 
             # check base compatibility
-            if not a._base == b._base:
+            if not a.base == b.base:
                 raise ValueError("bases are different")
 
             # A QFloat array is made of 2 parts, integer part and float part
@@ -987,23 +966,25 @@ class QFloat:
             mularray = fhe.zeros((len(a), newlength))
             for i in range(0, len(a)):
                 # index from b where the array mul should be inserted in mularray
-                indb = newints - a._ints + i + 1 - b._ints
-                # compute only needed multiplication of b._array*a._array[i], accounting for crops
+                indb = newints - a.ints + i + 1 - b.ints
+                # compute only needed multiplication of b._array*a._array[i],
+                # accounting for crops
                 ind1 = 0 if indb >= 0 else -indb
                 ind2 = min(len(b), newlength - indb)
                 if ind2 > ind1:
-                    mul = b._array[ind1:ind2] * a._array[i]
+                    mul = b.array[ind1:ind2] * a.array[i]
                     if ind2 - ind1 == 1:
                         mul = mul.reshape(1)
-                    insert_array_at_index(mul, mularray, i, indb + ind1)
+                    bpa.insert_array_at_index(mul, mularray, i, indb + ind1)
 
-            # the multiplication array is made from the sum of the mularray rows with product of signs
+            # the multiplication array is made from the sum
+            # of the mularray rows with product of signs
             multiplication = QFloat(
-                np.sum(mularray, axis=0), newints, a._base, False, a._sign * b._sign
+                np.sum(mularray, axis=0), newints, a.base, False, a.sign * b.sign
             )
 
             # base tidy to keep bitwidth low
-            multiplication.baseTidy()
+            multiplication.base_tidy()
 
         return multiplication
 
@@ -1014,18 +995,20 @@ class QFloat:
 
         Consider two integers a and b, that we want to divide with float precision fp:
         We have: (a / b) = (a * fp) / b / fp
-        Where a * fp / b is an integer division, and ((a * fp) / b / fp) is a float number with fp precision
+        Where a * fp / b is an integer division, and ((a * fp) / b / fp)
+        is a float number with fp precision
 
         WARNING: dividing by zero will give zero
         WARNING: precision of division does not increase
         """
         if isinstance(other, Zero):
-            raise Exception("division by Zero")
+            raise ValueError("division by Zero")
 
         if isinstance(other, SignedBinary):
-            self.selfCheckConvertFHE(other._encrypted)
+            self.self_check_convert_fhe(other.encrypted)
 
-            # In this case, the array is either unchanged (just signed), or overflowed (dividing by 0 causes overflow)
+            # In this case, the array is either unchanged (just signed),
+            # or overflowed (dividing by 0 causes overflow)
             is_zero = other.value == 0
             sign = other.value  # the value is also its sign
             self._array = (1 - is_zero) * self._array + is_zero * fhe.ones(
@@ -1034,11 +1017,11 @@ class QFloat:
             self._sign = (1 - is_zero) * sign + is_zero * self._sign
             return self
 
-        other.baseTidy()
+        other.base_tidy()
 
         QFloat.DIVISION += 1  # count only divisions with other Qfloat
-        self.checkCompatibility(other)
-        self.baseTidy()
+        self.check_compatibility(other)
+        self.base_tidy()
 
         # The float precision is the number of digits after the dot:
         fp = len(self) - self._ints
@@ -1047,10 +1030,11 @@ class QFloat:
         # Let's left shit the first array which corresponds by multiplying a by 2^fp:
         shift_arr = np.concatenate((self._array, fhe.zeros(fp)), axis=0)
         # Make the integer division (a*fp)/b with our long division algorithm:
-        div_array = base_p_division(shift_arr, other._array, self._base)
-        # The result array encodes for a QFloat with fp precision, which is equivalent to divide the result by fp
+        div_array = bpa.base_p_division(shift_arr, other._array, self._base)
+        # The result array encodes for a QFloat with fp precision,
+        # which is equivalent to divide the result by fp,
         # giving as expected the number (a * fp) / b / fp :
-        self._sign = self.getSign() * other.getSign()
+        self._sign = self.sign * other.sign
         self._array = div_array[fp:]
 
         return self
@@ -1071,28 +1055,16 @@ class QFloat:
             # special case when other is unencrypted 0, the result is an unencrypted 0
             return Zero()
 
-        elif isinstance(other, Tracer) or isinstance(other, numbers.Integral):
-            # create a QFloat if other is a number:
-            qf = QFloat.one(
-                len(self), self._ints, self._base, encrypted=isinstance(other, Tracer)
-            )
-            sign = np.sign(other)
-            qf._array[self._ints - 1] *= other * sign
-            qf._sign *= sign
-            qf.baseTidy()
-            return qf / self
-
-        elif isinstance(other, QFloat):
-            return other / self
-
-        elif isinstance(other, SignedBinary):
+        if isinstance(other, SignedBinary):
             # get sign, then invert ith this sign (can be 0)
             return self.invert(
                 other.value, len(self), self._ints
             )  # the value is also its sign
 
-        else:
-            raise ValueError("Unknown class for other")
+        if isinstance(other, QFloat):
+            return other / self
+
+        raise ValueError("Unknown class for other")
 
     def invert(self, sign=1, newlength=None, newints=None):
         """
@@ -1107,7 +1079,7 @@ class QFloat:
         QFloat.DIVISION += 1  # this division is counted because it is heavy
 
         # tidy before dividing
-        self.baseTidy()
+        self.base_tidy()
 
         if newlength is None:
             newlength = len(self)
@@ -1122,10 +1094,11 @@ class QFloat:
         fpself = len(self) - self._ints  # self float precision
 
         # We consider each array as representing integers a and b here
-        # Let's left shit the first array which corresponds by multiplying a by 2^(fpself + fp) (decimals of old+new precision):
+        # Let's left shit the first array which corresponds by multiplying
+        # a by 2^(fpself + fp) (decimals of old+new precision):
         shift_arr = np.concatenate((a, fhe.zeros(fpself + fp)), axis=0)
         # Make the integer division (a*fp)/b with our long division algorithm:
-        div_array = base_p_division(shift_arr, b, self._base)
+        div_array = bpa.base_p_division(shift_arr, b, self._base)
 
         # Correct size of div_array
         diff = newlength - div_array.size
@@ -1133,9 +1106,10 @@ class QFloat:
             div_array = np.concatenate((fhe.zeros(diff), div_array), axis=0)
         else:
             div_array = div_array[-diff:]
-        # The result array encodes for a QFloat with fp precision, which is equivalent to divide the result by fp
+        # The result array encodes for a QFloat with fp precision,
+        # which is equivalent to divide the result by fp,
         # giving as expected the number (a * fp) / b / fp :
-        newsign = sign * self.getSign()
+        newsign = sign * self.sign
         invert_div = QFloat(div_array, newints, self._base, True, newsign)
 
         return invert_div

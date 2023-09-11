@@ -8,7 +8,7 @@ poetry install
 ## Run
 ```bash
 poetry shell
-python matrix_inversion/matrix_invert.py
+python matrix_inversion/main.py
 ```
 
 ## Dev
@@ -16,14 +16,14 @@ python matrix_inversion/matrix_invert.py
 ### Running tests
 ```bash
 poetry shell
-python tests/test_QFloat.py
-python tests/test_QFloat_FHE.py
-python matrix_inversion/qf_invert.py
+python tests/test_qfloat.py
+python tests/test_qfloat_fhe.py
+python matrix_inversion/qfloat_matrix_inversion.py
 ```
 
 ### Contributing
 
-see TODO in `QFLoat.py` and `qf_invert.py`
+see TODO in `qfloat.py` and `qfloat_matrix_inversion.py`
 
 ## About
 
@@ -48,13 +48,13 @@ Furthermore, these algorithms require a lot of matrix products which are expensi
 
 ### How to set QFloats for the algorithm
 - QFloats are created with 3 custom parameters:
-	- `qf_base`: The base (base 2 is binary).
-	- `qf_len`: The total length of the integer array. The greater it is, the more precise the qfloats get.
-	- `qf_ints`: The length of the integer part of the float. The greater it is, the higher the **QFloat** can go.
-- The `qf_base` needs to be 2 for the current version of concrete-python (2.1.0), because there is currently a bug preventing the use of higher bases. Higher bases would reduce greatly the size of the array for a similar precision, so that the compilation and running times are expected to diminish, while the encryption time is expected to increase.
+	- `qfloat_base`: The base (base 2 is binary).
+	- `qfloat_len`: The total length of the integer array. The greater it is, the more precise the qfloats get.
+	- `qfloat_ints`: The length of the integer part of the float. The greater it is, the higher the **QFloat** can go.
+- The `qfloat_base` needs to be 2 for the current version of concrete-python (2.1.0), because there is currently a bug preventing the use of higher bases. Higher bases would reduce greatly the size of the array for a similar precision, so that the compilation and running times are expected to diminish, while the encryption time is expected to increase.
 - Any desired precision can be obtained if setting the QFloats with more precision (longer length), but the computation will be significantly slower.
 
 ### Further notice
-- Running the computations in pure python can be useful to assess the correcteness of the output, see `qf_invert.py` in the test main part.
+- Running the computations in pure python can be useful to assess the correcteness of the output, see `qfloat_matrix_inversion.py` in the test main part.
 - The inversion algorithm could be optimized to be faster for the specific task of inverting matrices of floats in range ~0-100, but it was kept more general here.
 
