@@ -488,6 +488,38 @@ def qfloat_lu_inverse(P, L, U, qfloat_len, qfloat_ints, true_division=False, deb
 ########################################################################################
 
 
+# def qfloat_inverse_2x2(qfloat_M, qfloat_len, qfloat_ints):
+#     """
+#     The inverse of a 2x2 matrix has a simple formula: M_inv = 1/det(M) * [[d,-b],[-c,a]]
+#     WARNING : The function is optimized for inputs in range [0,2^8] (see samplers)
+#     """
+#     [a, b] = qfloat_M[0]
+#     [c, d] = qfloat_M[1]
+
+#     ad = QFloat.from_mul(
+#         a, d, 2 * qfloat_ints + 3, 2 * qfloat_ints
+#     )  # produces a longer integer part
+#     bc = QFloat.from_mul(
+#         b, c, 2 * qfloat_ints + 3, 2 * qfloat_ints
+#     )  # produces a longer integer part
+
+#     det = ad - bc  # determinant of M in 17 bits
+
+#     det_inv = det.invert(
+#         1, qfloat_len, 0
+#     )  # computes invert with a lot of decimals but no integer part
+
+#     mul = lambda x, y: QFloat.from_mul(
+#         x, y, qfloat_len, qfloat_ints
+#     )  # multiply to output format
+#     M_inv = [
+#         [mul(d, det_inv), mul(b, det_inv).neg()],
+#         [mul(c, det_inv).neg(), mul(a, det_inv)],
+#     ]
+
+#     return M_inv
+
+
 def qfloat_inverse_2x2(qfloat_M, qfloat_len, qfloat_ints):
     """
     The inverse of a 2x2 matrix has a simple formula: M_inv = 1/det(M) * [[d,-b],[-c,a]]
@@ -496,11 +528,8 @@ def qfloat_inverse_2x2(qfloat_M, qfloat_len, qfloat_ints):
     [a, b] = qfloat_M[0]
     [c, d] = qfloat_M[1]
 
-    ad = QFloat.from_mul(
-        a, d, 2 * qfloat_ints + 3, 2 * qfloat_ints
-    )  # produces a longer integer part
-    bc = QFloat.from_mul(
-        b, c, 2 * qfloat_ints + 3, 2 * qfloat_ints
+    [ad, bc] = QFloat.multi_from_mul(
+        [a,b], [d,c], 2 * qfloat_ints + 3, 2 * qfloat_ints
     )  # produces a longer integer part
 
     det = ad - bc  # determinant of M in 17 bits

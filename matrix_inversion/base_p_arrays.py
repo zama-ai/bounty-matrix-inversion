@@ -213,7 +213,7 @@ def insert_array_at_index(a, B, i, j):
     """
     Insert elements of array a into array B[i,:] starting at index j
     """
-    # Case when i is negative
+    # Case when j is negative
     if j < 0:
         # We will take elements of a starting at index -j
         a = a[-j:]
@@ -223,6 +223,20 @@ def insert_array_at_index(a, B, i, j):
     # Insert elements from a into B[i]
     B[i, j : j + n] = a[:n]
 
+def insert_array_at_index_3D(A, B, i, j):
+    """
+    Insert elements of 2D array A into 3D array B[:,i,j:]
+    """
+    # Case when j is negative
+    if j < 0:
+        # We will take elements of a starting at index -j
+        A = A[:,-j:]
+        j = 0
+    # Compute the number of elements we can insert from a into b
+    n = min(B[0,i].size - j, A[0].size)
+    # Insert elements from a into B[i]
+    B[:, i, j : j + n] = A[:, :n]
+
 
 def tensor_fast_boolean_mul(x, boolean):
     """
@@ -231,4 +245,3 @@ def tensor_fast_boolean_mul(x, boolean):
     """
     pack = (x * 2) + boolean
     return fhe.univariate(lambda pack: np.where(pack & 1 == 0, 0, pack >> 1))(pack)
-    

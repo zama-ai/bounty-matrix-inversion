@@ -448,6 +448,20 @@ class QFloat:
         raise ValueError('Setting this variables from outside is forbidden')
 
     @property
+    def is_base_tidy(self):
+        """
+        Getter of is_base_tidy
+        """
+        return self._is_base_tidy
+
+    @is_base_tidy.setter
+    def is_base_tidy(self, newis_base_tidy):
+        """
+        Setter of is_base_tidy
+        """
+        raise ValueError('Setting this variables from outside is forbidden')
+
+    @property
     def array(self):
         """
         Getter of array
@@ -962,10 +976,9 @@ class QFloat:
         else:
             cls.MULTIPLICATION += 1  # count only multiplications with other Qfloat
 
-            # always base tidy before a multiplication between
-            # two QFloats prevent multiplying big bitwidths
-            a.base_tidy()
-            b.base_tidy()
+            # QFloats should always be base tidy before a multiplication
+            assert(a.is_base_tidy)
+            assert(b.is_base_tidy)
 
             # convert a to encrypted if needed
             cls.check_convert_fhe(a, b.encrypted)
@@ -1004,6 +1017,126 @@ class QFloat:
             multiplication.base_tidy()
 
         return multiplication
+
+    @classmethod
+    def multi_from_mul(cls, list_a, list_b, newlength, newints):
+        """
+        Compute the multiplication of QFloats elements of list_a and list_b,
+        inside new QFloats of given length and ints
+
+        The objective is to gain speed by grouping the multiplication operations
+
+        Warning: if the new length and ints are too low,
+        the result might be cropped
+        """
+
+        # special case when multiplying by unencrypted 0,
+        # the result is an unencrypted 0
+
+        a0 = list_a[0]
+        b0 = list_b[0]
+        # make sure both the lists and arrays have all the same sizes and bases:
+        assert(len(list_a) == len(list_b))
+        for i in range(len(list_a)):
+            assert( len(list_a[i]) == len(a0) )
+            assert( len(list_b[i]) == len(a0) )
+            assert( list_a[i].base == a0.base )
+            assert( list_b[i].base == a0.base )
+            # and check that ints are the same within a and b
+            assert( list_a[i].ints == a0.ints )
+            assert( list_b[i].ints == list_b[0].ints )                       
+
+        # QFloats should always be base tidy before a multiplication
+        for a in list_a:
+            assert(not isinstance(a, cls) or a.is_base_tidy);
+        for b in list_b:
+            assert(not isinstance(b, cls) or b.is_base_tidy);            
+
+        # prepate the list of multiplications with None values for now
+        list_ab = [None]*len(list_a)
+
+        # skip the easy multiplication (Zero or SignedBinary)
+        indices_qfloat_mul = [] # list the qfloat x qfloat mul that will need to be done
+        for i in range(len(list_a)):
+            a = list_a[i]
+            b = list_b[i]
+
+            if isinstance(a, Zero) or isinstance(b, Zero):
+                list_ab[i] = Zero()
+
+            elif isinstance(a, SignedBinary) or isinstance(b, SignedBinary):
+                if isinstance(a, SignedBinary) and isinstance(b, SignedBinary):
+                    list_ab[i] = a * b
+                # simple multiplication and size setting
+                list_ab[i] = a * b
+                list_ab[i].set_lenints(newlength, newints)
+
+            else:
+                indices_qfloat_mul.append(i)
+
+        n_qfloat_mul = len(indices_qfloat_mul)
+        cls.MULTIPLICATION += n_qfloat_mul # count only multiplications with other Qfloat
+
+        if n_qfloat_mul == 0:
+            return list_ab
+
+        if n_qfloat_mul == 1:
+            index = indices_qfloat_mul[0]
+            list_ab[index] = cls.from_mul(list_a[index], list_b[index], newlength, newints)
+            return list_ab
+        
+        # n_qfloat_mul > 1 means we can make tensorization to gain speed :
+
+        mularray = fhe.zeros((n_qfloat_mul, len(a), newlength))
+
+        # concat arrays of QFloats that will be multiplied
+        a_arrays = np.concatenate(
+            tuple( np.reshape(list_a[i].array,(1,-1)) for i in indices_qfloat_mul),
+            axis=0
+        )        
+        b_arrays = np.concatenate(
+            tuple( np.reshape(list_b[i].array,(1,-1)) for i in indices_qfloat_mul),
+            axis=0
+        )
+
+        for i in range(0, len(a0)):
+            # index from b where the array mul should be inserted in mularray
+            indb = newints - a0.ints + i + 1 - b0.ints
+            # compute only needed multiplication of b._array*a._array[i],
+            # accounting for crops
+            ind1 = 0 if indb >= 0 else -indb
+            ind2 = min(len(b0), newlength - indb)
+            if ind2 > ind1:
+                if a0.base == 2: # use fast boolean multiplication in binary
+                    mul = bpa.tensor_fast_boolean_mul(b_arrays[:,ind1:ind2], a_arrays[:,i].reshape((n_qfloat_mul,1)))
+                else:
+                    mul = b_arrays[:,ind1:ind2] * a_arrays[:,i]
+
+                # if ind2 - ind1 == 1:
+                #     mul = mul.reshape((n_qfloat_mul,1))
+                bpa.insert_array_at_index_3D(mul, mularray, i, indb + ind1)
+
+        # the multiplication array is made from the sum
+        # of the mularray rows with product of signs
+        sum_array = np.sum(mularray, axis=1)
+
+        for i in range(n_qfloat_mul):
+            index = indices_qfloat_mul[i]
+            multiplication = QFloat(
+                sum_array[i], newints, a0.base, False, list_a[index].sign * list_b[index].sign
+            )
+
+            # base tidy to keep bitwidth low
+            # TODO: use multi tidying
+            multiplication.base_tidy()  
+
+            assert(list_ab[indices_qfloat_mul[i]] is None) # just to be sure
+
+            # put result in the list
+            list_ab[index] = multiplication
+
+        return list_ab
+
 
     def __itruediv__(self, other):
         """
