@@ -867,6 +867,7 @@ def run_qfloat_circuit_fhe(
         encrypted = measure_time(circuit.encrypt, "Encrypting", qfloat_arrays, qfloat_signs)
         run = measure_time(circuit.run, "Running", encrypted)
         decrypted = circuit.decrypt(run)
+
     else:
         decrypted = measure_time(circuit.simulate, "Simulating", qfloat_arrays, qfloat_signs)
 
@@ -942,7 +943,7 @@ def test_qfloat_inverse_fhe(circuit, M, params):
 
     qfloat_Res = run_qfloat_circuit_fhe(circuit, M, qfloat_len, qfloat_ints, qfloat_base, False)
 
-    print("\nQFloat inverse (Running) :")
+    print("\nQFloat inverse (FHE) :")
     print(qfloat_Res)
     print(" ")
 
@@ -1030,7 +1031,12 @@ if __name__ == "__main__":
 
     # test inversion in fhe:
     # -----------------------------
+    start = time.time()
+
     QFloat.reset_stats()
     circuit = compile_circuit(params, sampler, qfloat_matrix_inverse)
     QFloat.show_stats()
     test_qfloat_inverse_fhe(circuit, M, params)
+
+    end = time.time()
+    print(f"|  Total time : {end-start:.2f} s  |")

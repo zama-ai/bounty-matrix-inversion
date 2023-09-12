@@ -57,7 +57,6 @@ def base_p_to_float(arr, p):
         f += arr[i] * (p ** -(i + 1))
     return f
 
-
 def float_to_base_p(f, precision, p):
     """
     Convert a float of type 0.xxx.. to a base-p array with a given precision.
@@ -224,3 +223,12 @@ def insert_array_at_index(a, B, i, j):
     # Insert elements from a into B[i]
     B[i, j : j + n] = a[:n]
 
+
+def tensor_fast_boolean_mul(x, boolean):
+    """
+    Fast multiplication of a tensor with a boolean
+    This is faster than usual multiplication in FHE
+    """
+    pack = (x * 2) + boolean
+    return fhe.univariate(lambda pack: np.where(pack & 1 == 0, 0, pack >> 1))(pack)
+    
