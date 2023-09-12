@@ -629,6 +629,26 @@ class QFloat:
 
         self._is_base_tidy = True
 
+    @classmethod
+    def multi_base_tidy(cls, arrays, base):
+        """
+        Tidy arrays so that values are in range [-(base-1), base-1]
+        as they should be, but signs can be mixed
+        Keeping arrays untidy when possible saves computation time
+        """
+
+        dividends = fhe.zeros(arrays.shape[0])
+        for i in reversed(range(arrays.shape[1])):
+            curr = arrays[:,i] + dividends
+            dividends = (np.abs(curr) // base) * np.sign(curr)
+            curr -= dividends * base
+            arrays[:,i] = curr[:]
+
+        # TODO: keep track of overflow
+        # QFloat.OVERFLOW = np.any(dividends)
+
+        return arrays
+
     def tidy(self):
         """
         Tidy array with negative values in range ]-base, base[ so they get to range [0, base[
@@ -1120,19 +1140,22 @@ class QFloat:
         # of the mularray rows with product of signs
         sum_array = np.sum(mularray, axis=1)
 
+        # multi tidy
+        sum_array = cls.multi_base_tidy(sum_array, a0.base)
+
         for i in range(n_qfloat_mul):
             index = indices_qfloat_mul[i]
+            # fill a QFloat from the results (which are tidy)
             multiplication = QFloat(
-                sum_array[i], newints, a0.base, False, list_a[index].sign * list_b[index].sign
+                sum_array[i], newints, a0.base, True, list_a[index].sign * list_b[index].sign
             )
-
-            # base tidy to keep bitwidth low
-            # TODO: use multi tidying
-            multiplication.base_tidy()  
-
-            assert(list_ab[indices_qfloat_mul[i]] is None) # just to be sure
+            # multiplication = QFloat(
+            #     sum_array[i], newints, a0.base, True, list_a[index].sign * list_b[index].sign
+            # )
+            # multiplication.base_tidy()
 
             # put result in the list
+            assert(list_ab[indices_qfloat_mul[i]] is None) # just to be sure
             list_ab[index] = multiplication
 
         return list_ab

@@ -151,9 +151,9 @@ def base_p_division(dividend, divisor, p):
             is_ge = is_greater_or_equal_base_p(remainder, divisor)
             # Subtract the divisor from the remainder
             remainder = (
-                is_ge * base_p_subtraction(remainder, divisor, p)
-                + (1 - is_ge) * remainder
-            )
+                tensor_fast_boolean_mul(base_p_subtraction(remainder, divisor, p), is_ge)
+                + tensor_fast_boolean_mul(remainder,(1 - is_ge))
+            )          
             # Set the current quotient bit to 1
             quotient[i] += is_ge
 
@@ -243,7 +243,8 @@ def insert_array_at_index_3D(A, B, i, j):
 def tensor_fast_boolean_mul(x, boolean):
     """
     Fast multiplication of a tensor with a boolean
-    This is faster than usual multiplication in FHE
+    This is (Supposedly)  faster than usual multiplication in FHE
+    it runs faster but compiles slower, it seems to be a bit better overall
     """
     pack = (x * 2) + boolean
     return fhe.univariate(lambda pack: np.where(pack & 1 == 0, 0, pack >> 1))(pack)
