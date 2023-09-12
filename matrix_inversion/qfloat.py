@@ -1110,7 +1110,7 @@ class QFloat:
                 if a0.base == 2: # use fast boolean multiplication in binary
                     mul = bpa.tensor_fast_boolean_mul(b_arrays[:,ind1:ind2], a_arrays[:,i].reshape((n_qfloat_mul,1)))
                 else:
-                    mul = b_arrays[:,ind1:ind2] * a_arrays[:,i]
+                    mul = b_arrays[:,ind1:ind2] * a_arrays[:,i].reshape((n_qfloat_mul,1))
 
                 # if ind2 - ind1 == 1:
                 #     mul = mul.reshape((n_qfloat_mul,1))

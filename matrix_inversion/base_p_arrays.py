@@ -169,10 +169,12 @@ def is_greater_or_equal(a, b):
 
     The overflow is a fast way to compute wether a>=b <=> not a<b
     """
+    min_size = min(a.size, b.size)
+    a_minus_b = a[-min_size:] - b[-min_size:]
     borrow = 0
-    for i in range(min(a.size, b.size)):
+    for i in range(min_size):
         # report borrow
-        borrow = a[-i - 1] - b[-i - 1] - borrow < 0
+        borrow = a_minus_b[-i - 1] - borrow < 0
     return 1 - borrow
 
 
