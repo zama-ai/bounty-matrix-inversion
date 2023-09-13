@@ -889,28 +889,38 @@ class QFloat:
             n = len(self)
             mularray = fhe.zeros((n, n))
 
-            if self._base == 2: # use fast tensor boolean multiplication in binary
-                # integer part, shift  to the left
-                for i in range(0, self._ints):
-                    mularray[i, 0 : n - (self._ints - 1 - i)] = (
-                        bpa.tensor_fast_boolean_mul(other._array[self._ints - 1 - i :], self._array[i])
-                    )
-                # float part, shift to the right
-                for i in range(self._ints, n):
-                    mularray[i, 1 + i - self._ints :] = (
-                        bpa.tensor_fast_boolean_mul(other._array[0 : n - (i - self._ints) - 1], self._array[i])
-                    )
-            else:
-                # integer part, shift  to the left
-                for i in range(0, self._ints):
-                    mularray[i, 0 : n - (self._ints - 1 - i)] = (
-                        self._array[i] * other._array[self._ints - 1 - i :]
-                    )
-                # float part, shift to the right
-                for i in range(self._ints, n):
-                    mularray[i, 1 + i - self._ints :] = (
-                        self._array[i] * other._array[0 : n - (i - self._ints) - 1]
-                    )
+            # if self._base == 2: # use fast tensor boolean multiplication in binary
+            #     # integer part, shift  to the left
+            #     for i in range(0, self._ints):
+            #         mularray[i, 0 : n - (self._ints - 1 - i)] = (
+            #             bpa.tensor_fast_boolean_mul(other._array[self._ints - 1 - i :], self._array[i])
+            #         )
+            #     # float part, shift to the right
+            #     for i in range(self._ints, n):
+            #         mularray[i, 1 + i - self._ints :] = (
+            #             bpa.tensor_fast_boolean_mul(other._array[0 : n - (i - self._ints) - 1], self._array[i])
+            #         )
+            # else:
+            #     # integer part, shift  to the left
+            #     for i in range(0, self._ints):
+            #         mularray[i, 0 : n - (self._ints - 1 - i)] = (
+            #             self._array[i] * other._array[self._ints - 1 - i :]
+            #         )
+            #     # float part, shift to the right
+            #     for i in range(self._ints, n):
+            #         mularray[i, 1 + i - self._ints :] = (
+            #             self._array[i] * other._array[0 : n - (i - self._ints) - 1]
+            #         )
+            # integer part, shift  to the left
+            for i in range(0, self._ints):
+                mularray[i, 0 : n - (self._ints - 1 - i)] = (
+                    self._array[i] * other._array[self._ints - 1 - i :]
+                )
+            # float part, shift to the right
+            for i in range(self._ints, n):
+                mularray[i, 1 + i - self._ints :] = (
+                    self._array[i] * other._array[0 : n - (i - self._ints) - 1]
+                )            
 
             # the multiplication array is made from the sum of the muarray rows
             self._array = np.sum(mularray, axis=0)
@@ -1018,10 +1028,11 @@ class QFloat:
                 ind1 = 0 if indb >= 0 else -indb
                 ind2 = min(len(b), newlength - indb)
                 if ind2 > ind1:
-                    if a.base == 2: # use fast boolean multiplication in binary
-                        mul = bpa.tensor_fast_boolean_mul(b.array[ind1:ind2], a.array[i])
-                    else:
-                        mul = b.array[ind1:ind2] * a.array[i]
+                    # if a.base == 2: # use fast boolean multiplication in binary
+                    #     mul = bpa.tensor_fast_boolean_mul(b.array[ind1:ind2], a.array[i])
+                    # else:
+                    #     mul = b.array[ind1:ind2] * a.array[i]
+                    mul = b.array[ind1:ind2] * a.array[i]
 
                     if ind2 - ind1 == 1:
                         mul = mul.reshape(1)
@@ -1050,8 +1061,8 @@ class QFloat:
         the result might be cropped
         """
 
-        # special case when multiplying by unencrypted 0,
-        # the result is an unencrypted 0
+        # Objects can be either QFloats, SignedBinaries or Zeros
+        # We will tensorize only pairs of QFloats
 
         a0 = list_a[0]
         b0 = list_b[0]
@@ -1127,10 +1138,11 @@ class QFloat:
             ind1 = 0 if indb >= 0 else -indb
             ind2 = min(len(b0), newlength - indb)
             if ind2 > ind1:
-                if a0.base == 2: # use fast boolean multiplication in binary
-                    mul = bpa.tensor_fast_boolean_mul(b_arrays[:,ind1:ind2], a_arrays[:,i].reshape((n_qfloat_mul,1)))
-                else:
-                    mul = b_arrays[:,ind1:ind2] * a_arrays[:,i].reshape((n_qfloat_mul,1))
+                # if a0.base == 2: # use fast boolean multiplication in binary
+                #     mul = bpa.tensor_fast_boolean_mul(b_arrays[:,ind1:ind2], a_arrays[:,i].reshape((n_qfloat_mul,1)))
+                # else:
+                #     mul = b_arrays[:,ind1:ind2] * a_arrays[:,i].reshape((n_qfloat_mul,1))
+                mul = b_arrays[:,ind1:ind2] * a_arrays[:,i].reshape((n_qfloat_mul,1))
 
                 # if ind2 - ind1 == 1:
                 #     mul = mul.reshape((n_qfloat_mul,1))

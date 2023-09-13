@@ -990,7 +990,7 @@ if __name__ == "__main__":
 
     # low precision
     true_division = False
-    n = 2
+    n = 3
     qfloat_base = 2
     qfloat_len = 23
     qfloat_ints = 9
