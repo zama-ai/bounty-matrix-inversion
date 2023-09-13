@@ -199,6 +199,14 @@ def qfloat_list_dot_product(list1, list2):
     for i in range(1, len(list1)):
         result += list1[i] * list2[i]  # in place addition is supported
 
+    # # Tensorized way:
+    # multiplications = QFloat.multi_from_mul(
+    #     list1, list2, None, None
+    # )
+    # result = multiplications[0]
+    # for m in multiplications[1:]:
+    #     result += m  # in place addition is supported    
+
     return result
 
 
@@ -459,10 +467,10 @@ def qfloat_lu_inverse(P, L, U, qfloat_len, qfloat_ints, true_division=False, deb
 
     # precompute inverse of U to make less divisions (simplify U before as we know its range)
     if not true_division:
-        #Ujj_inv = [U[j][j].invert(1, qfloat_len, 0) for j in range(n)]
-        Ujj_inv = QFloat.multi_invert(
-            [U[j][j] for j in range(n)], 1, qfloat_len, 0
-        )
+        Ujj_inv = [U[j][j].invert(1, qfloat_len, 0) for j in range(n)]
+        # Ujj_inv = QFloat.multi_invert(
+        #     [U[j][j] for j in range(n)], 1, qfloat_len, 0
+        # )
     for i in range(n - 1, -1, -1):
         # X[i, -1] = Y[i, -1] / U[-1, -1]
         if true_division:
@@ -993,7 +1001,7 @@ if __name__ == "__main__":
 
     # low precision
     true_division = False
-    n = 3
+    n = 2
     qfloat_base = 2
     qfloat_len = 23
     qfloat_ints = 9

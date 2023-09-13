@@ -325,11 +325,10 @@ def insert_array_at_index_3D(A, B, i, j):
     B[:, i, j : j + n] = A[:, :n]
 
 
-# def tensor_fast_boolean_mul(x, boolean):
-#     """
-#     Fast multiplication of a tensor with a boolean
-#     This is (Supposedly)  faster than usual multiplication in FHE
-#     it runs faster but compiles slower, it seems to be a bit better overall
-#     """
-#     pack = (x * 2) + boolean
-#     return fhe.univariate(lambda pack: np.where(pack & 1 == 0, 0, pack >> 1))(pack)
+def tensor_fast_boolean_mul(x, boolean):
+    """
+    Fast multiplication of a tensor with a boolean
+    This is sometimes faster than usual multiplications
+    """
+    pack = (x * 2) + boolean
+    return fhe.univariate(lambda pack: np.where(pack & 1 == 0, 0, pack >> 1))(pack)
