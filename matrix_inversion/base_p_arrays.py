@@ -112,23 +112,48 @@ def base_p_subtraction_overflow(a, b, p):
     If a < b, the result is wrong and full of ones on the left part,
     so we can return in addition wether a < b
     """
+    min_size = min(a.size, b.size)
     difference = fhe.zeros(a.size)
     borrow = 0
-    for i in range(min(a.size, b.size)):
+    a_minus_b = a[-min_size:] - b[-min_size:]
+    for i in range(min_size):
         # Perform subtraction for each bit
-        temp = a[-i - 1] - b[-i - 1] - borrow
+        temp = a_minus_b[-i - 1] - borrow
         borrow = temp < 0
         difference[-i - 1] = temp + p * borrow
     return difference, borrow
 
 
+def multi_base_p_subtraction_overflow(a_arrays, b_arrays, p):
+    """
+    Tensorized version of base_p_subtraction_overflow
+    """
+    min_size = min(a_arrays.shape[1], b_arrays.shape[1])
+    difference = fhe.zeros(a_arrays.shape)
+    borrow = fhe.zeros(a_arrays.shape[0])
+    a_minus_b = a_arrays[:, -min_size:] - b_arrays[:, -min_size:]
+    for i in range(min_size):
+        # Perform subtraction for each bit
+        temp = a_minus_b[:,-i - 1] - borrow
+        borrow = temp < 0
+        difference[:, -i - 1] = temp + p * borrow
+    return difference, borrow
+
+
 def base_p_subtraction(a, b, p):
     """
-    Subtract arrays in base p. (a and b must be tidy, postive with a >= b)
+    Subtract arrays in base p. (a and b must be tidy, positive with a >= b)
     Also, if they have different sizes, the longer array is considered
     to have extra zeros to the left
     """
     return base_p_subtraction_overflow(a, b, p)[0]
+
+
+def multi_base_p_subtraction(a_arrays, b_arrays, p):
+    """
+    Tensorized version of base_p_subtraction
+    """
+    return multi_base_p_subtraction_overflow(a_arrays, b_arrays, p)[0]    
 
 
 def base_p_division(dividend, divisor, p):
@@ -162,6 +187,39 @@ def base_p_division(dividend, divisor, p):
     return quotient
 
 
+def multi_base_p_division(dividends, divisors, p):
+    """
+    Tensorized version of base_p_division
+    """
+    n_arrays = dividends.shape[0]
+    # Initialize the quotients arrays
+    quotients = fhe.zeros(dividends.shape)
+    # Initialize the remainders
+    remainders = dividends[:,0].reshape((n_arrays,1))
+
+    for i in range(dividends.shape[1]):
+        if i > 0:
+            # Left-roll the remainders and bring down the next bit from the dividends
+            # also cut remainders if its size is bigger than divisors's, cause there are extra zeros
+            d = 1 * (remainders.shape[1] > divisors.shape[1])
+            remainders = np.concatenate((remainders[:,d:], dividends[:,i].reshape((n_arrays,1))), axis=1)
+        # If the remainders is larger than or equal to the divisors
+        for _ in range(p - 1):
+            are_ge = multi_is_greater_or_equal_base_p(remainders, divisors)
+            are_ge = are_ge.reshape((n_arrays,1))
+            # Subtract the divisors from the remainders
+            remainders = (
+                # tensor_fast_boolean_mul(base_p_subtraction(remainders, divisors, p), are_ge)
+                # + tensor_fast_boolean_mul(remainders,(1 - are_ge))
+                multi_base_p_subtraction(remainders, divisors, p) * are_ge
+                + remainders * (1 - are_ge)
+            )          
+            # Set the current quotient bit to 1
+            quotients[:,i] += are_ge.flatten()
+
+    return quotients
+
+
 def is_greater_or_equal(a, b):
     """
     Fast computation of wether an array number a is greater or equal to an array number b
@@ -179,6 +237,17 @@ def is_greater_or_equal(a, b):
         borrow = a_minus_b[-i - 1] - borrow < 0
     return 1 - borrow
 
+def multi_is_greater_or_equal(a_arrays, b_arrays):
+    """
+    Tensorized version of is_greater_or_equal
+    """
+    min_size = min(a_arrays.shape[1], b_arrays.shape[1])
+    a_minus_b = a_arrays[:,-min_size:] - b_arrays[:,-min_size:]
+    borrow = fhe.zeros(a_arrays.shape[0])
+    for i in range(min_size):
+        # report borrow
+        borrow = a_minus_b[:,-i - 1] - borrow < 0
+    return 1 - borrow
 
 def is_equal(a, b):
     """
@@ -213,6 +282,19 @@ def is_greater_or_equal_base_p(a, b):
     return is_greater_or_equal(a[-diff:], b) | (np.sum(a[0:-diff]) > 0)
 
 
+def multi_is_greater_or_equal_base_p(a_arrays, b_arrays):
+    """
+    Tensorized version of is_greater_or_equal_base_p
+    """
+    diff = b_arrays.shape[1] - a_arrays.shape[1]
+    if diff == 0:
+        return multi_is_greater_or_equal(a_arrays, b_arrays)
+    if diff > 0:
+        return multi_is_greater_or_equal(a_arrays, b_arrays[:,diff:]) & (np.sum(b_arrays[:,0:diff]) == 0)
+
+    return multi_is_greater_or_equal(a_arrays[:,-diff:], b_arrays) | (np.sum(a_arrays[:,0:-diff]) > 0)    
+
+
 def insert_array_at_index(a, B, i, j):
     """
     Insert elements of array a into array B[i,:] starting at index j
@@ -229,7 +311,8 @@ def insert_array_at_index(a, B, i, j):
 
 def insert_array_at_index_3D(A, B, i, j):
     """
-    Insert elements of 2D array A into 3D array B[:,i,j:]
+    Tensorized version of insert_array_at_index
+    Insert elements of 2D array A into 3D array B[:,i,j:]    
     """
     # Case when j is negative
     if j < 0:

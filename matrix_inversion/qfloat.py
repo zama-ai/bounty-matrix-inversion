@@ -1050,7 +1050,7 @@ class QFloat:
         return multiplication
 
     @classmethod
-    def multi_from_mul(cls, list_a, list_b, newlength, newints):
+    def multi_from_mul(cls, list_a, list_b, newlength=None, newints=None):
         """
         Compute the multiplication of QFloats elements of list_a and list_b,
         inside new QFloats of given length and ints
@@ -1202,11 +1202,13 @@ class QFloat:
             self._sign = (1 - is_zero) * sign + is_zero * self._sign
             return self
 
-        other.base_tidy()
+        # other must be tidy before division
+        assert(other.is_base_tidy)
 
         QFloat.DIVISION += 1  # count only divisions with other Qfloat
         self.check_compatibility(other)
-        self.base_tidy()
+        # must be tidy before division
+        assert(self._is_base_tidy)
 
         # The float precision is the number of digits after the dot:
         fp = len(self) - self._ints
@@ -1263,8 +1265,8 @@ class QFloat:
 
         QFloat.DIVISION += 1  # this division is counted because it is heavy
 
-        # tidy before dividing
-        self.base_tidy()
+        # must be base tidy before dividing
+        assert(self._is_base_tidy)
 
         if newlength is None:
             newlength = len(self)
@@ -1298,3 +1300,64 @@ class QFloat:
         invert_div = QFloat(div_array, newints, self._base, True, newsign)
 
         return invert_div
+
+    @classmethod
+    def multi_invert(cls, list_qfloats, sign=1, newlength=None, newints=None):
+        """
+        Compute the signed invert of the QFloat, with different length and ints values if requested
+        """
+        if not (
+            isinstance(sign, SignedBinary)
+            or (isinstance(sign, numbers.Integral) and abs(sign) == 1)
+        ):
+            raise ValueError("sign must be a SignedBinary or a signed binary scalar")
+
+        qf0 = list_qfloats[0]
+        for qfloat in list_qfloats:
+            assert(isinstance(qfloat, cls))
+            assert(qfloat.is_base_tidy)
+            assert(len(qfloat) == len(qf0))
+            assert(qfloat.base == qf0.base)
+            assert(qfloat.ints == qf0.ints)
+
+        n_qfloats = len(list_qfloats)
+
+        QFloat.DIVISION += n_qfloats  # this division is counted because it is heavy
+
+        if newlength is None:
+            newlength = len(qf0)
+        if newints is None:
+            newints = qf0.ints
+
+        a_arrays = fhe.ones((n_qfloats,1))  # arrays with one value to save computations
+        b_arrays = np.concatenate(
+            tuple( np.reshape(list_qfloats[i].array,(1,-1)) for i in range(n_qfloats)),
+            axis=0
+        )  
+
+        # The float precision is the number of digits after the dot:
+        fp = newlength - newints  # new float precision
+        fpself = len(qf0) - qf0.ints  # current float precision
+
+        # We consider each array as representing integers a and b here
+        # Let's left shit the first array which corresponds by multiplying
+        # a by 2^(fpself + fp) (decimals of old+new precision):
+        shift_arr = np.concatenate((a_arrays, fhe.zeros((n_qfloats, fpself + fp))), axis=1)
+        # Make the integer division (a*fp)/b with our long division algorithm:
+        div_array = bpa.multi_base_p_division(shift_arr, b_arrays, qf0.base)
+
+        # Correct size of div_array
+        diff = newlength - div_array.shape[1]
+        if diff > 0:
+            div_array = np.concatenate((fhe.zeros((n_qfloats,diff)), div_array), axis=1)
+        else:
+            div_array = div_array[:,-diff:]
+        # The result array encodes for a QFloat with fp precision,
+        # which is equivalent to divide the result by fp,
+        # giving as expected the number (a * fp) / b / fp :
+        results = []
+        for i in range(n_qfloats):
+            newsign = sign * list_qfloats[i].sign
+            results.append( QFloat(div_array[i,:], newints, qf0.base, True, newsign) )
+
+        return results        
