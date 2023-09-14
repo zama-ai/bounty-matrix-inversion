@@ -978,7 +978,7 @@ def compile_circuit(params, sampler, circuit_function, verbose=True):
             insecure_key_cache_location=".keys",
             single_precision=False,
             show_graph=False,
-            # dataflow_parallelize=True,
+            dataflow_parallelize=True,
         ),
         verbose=False,
     )
