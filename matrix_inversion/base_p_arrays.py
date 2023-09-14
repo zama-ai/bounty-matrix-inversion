@@ -7,6 +7,7 @@ author : Lcressot
 import numpy as np
 from concrete import fhe
 
+
 def base_p_to_int(arr, p):
     """
     Convert base p array to int
@@ -57,6 +58,7 @@ def base_p_to_float(arr, p):
         f += arr[i] * (p ** -(i + 1))
     return f
 
+
 def float_to_base_p(f, precision, p):
     """
     Convert a float of type 0.xxx.. to a base-p array with a given precision.
@@ -82,7 +84,7 @@ def float_to_base_p(f, precision, p):
 def base_p_addition(a, b, p, inplace=False):
     """
     Add arrays in base p. (a and b must be positive and tidy)
-    
+
     WARNING: If a and b have different sizes, the longer array is
     considered to have zeros on its left side
 
@@ -147,7 +149,7 @@ def multi_base_p_subtraction(a_arrays, b_arrays, p, overflow=False):
     a_minus_b = a_arrays[:, -min_size:] - b_arrays[:, -min_size:]
     for i in range(min_size):
         # Perform subtraction for each bit
-        temp = a_minus_b[:,-i - 1] - borrow
+        temp = a_minus_b[:, -i - 1] - borrow
         borrow = temp < 0
         difference[:, -i - 1] = temp + p * borrow
 
@@ -166,7 +168,6 @@ def multi_base_p_subtraction(a_arrays, b_arrays, p, overflow=False):
             a_lt_b = borrow | (np.sum(b_arrays[:, 0:diff], axis=1) > 0)
 
         return difference, a_lt_b
- 
 
 
 def base_p_division(dividend, divisor, p):
@@ -186,15 +187,16 @@ def base_p_division(dividend, divisor, p):
             remainder = np.concatenate((remainder[d:], dividend[i].reshape(1)), axis=0)
         # If the remainder is larger than or equal to the divisor
         for _ in range(p - 1):
-            # let's compute both remainder - divisor and remainded < divisor at once
+            # let's compute both (remainder - divisor) and (remainded < divisor) at once
             difference, is_lt = base_p_subtraction(remainder, divisor, p, True)
-            is_ge = ( 1 - is_lt )
+            is_ge = 1 - is_lt
 
             remainder = (
                 # tensor_fast_boolean_mul(difference, is_ge)
                 # + tensor_fast_boolean_mul(remainder, is_lt)
-                difference * is_ge + remainder * is_lt
-            )                     
+                difference * is_ge
+                + remainder * is_lt
+            )
             # Update the current quotient digit
             quotient[i] += is_ge
 
@@ -209,26 +211,31 @@ def multi_base_p_division(dividends, divisors, p):
     # Initialize the quotients arrays
     quotients = fhe.zeros(dividends.shape)
     # Initialize the remainders
-    remainders = dividends[:,0].reshape((n_arrays,1))
+    remainders = dividends[:, 0].reshape((n_arrays, 1))
 
     for i in range(dividends.shape[1]):
         if i > 0:
             # Left-roll the remainders and bring down the next bit from the dividends
             # also cut remainders if its size is bigger than divisors's, cause there are extra zeros
             d = 1 * (remainders.shape[1] > divisors.shape[1])
-            remainders = np.concatenate((remainders[:,d:], dividends[:,i].reshape((n_arrays,1))), axis=1)
+            remainders = np.concatenate(
+                (remainders[:, d:], dividends[:, i].reshape((n_arrays, 1))), axis=1
+            )
         # If the remainders is larger than or equal to the divisors
         for _ in range(p - 1):
-            # let's compute both remainders - divisors and remainded < divisors at once
-            differences, are_lt = multi_base_p_subtraction(remainders, divisors, p, True)
-            are_lt = are_lt.reshape((n_arrays,1))
-            are_ge = ( 1 - are_lt )
+            # let's compute both (remainders - divisors) and (remainders < divisors) at once
+            differences, are_lt = multi_base_p_subtraction(
+                remainders, divisors, p, True
+            )
+            are_lt = are_lt.reshape((n_arrays, 1))
+            are_ge = 1 - are_lt
 
             remainders = (
                 # tensor_fast_boolean_mul(differences, are_ge)
                 # + tensor_fast_boolean_mul(remainders, are_lt)
-                differences * are_ge + remainders * are_lt
-            )                     
+                differences * are_ge
+                + remainders * are_lt
+            )
             # Update the current quotient digit
             quotients[:, i] += are_ge.flatten()
 
@@ -238,7 +245,7 @@ def multi_base_p_division(dividends, divisors, p):
 def is_greater_or_equal(a, b):
     """
     Fast computation of wether an array number a is greater or equal to an array number b
-    
+
     Both arrays must be base tidy, in which case the subtraction
     of a-b will work if a>=b and overflow if a<b
 
@@ -252,17 +259,19 @@ def is_greater_or_equal(a, b):
         borrow = a_minus_b[-i - 1] - borrow < 0
     return 1 - borrow
 
+
 def multi_is_greater_or_equal(a_arrays, b_arrays):
     """
     Tensorized version of is_greater_or_equal
     """
     min_size = min(a_arrays.shape[1], b_arrays.shape[1])
-    a_minus_b = a_arrays[:,-min_size:] - b_arrays[:,-min_size:]
+    a_minus_b = a_arrays[:, -min_size:] - b_arrays[:, -min_size:]
     borrow = fhe.zeros(a_arrays.shape[0])
     for i in range(min_size):
         # report borrow
-        borrow = a_minus_b[:,-i - 1] - borrow < 0
+        borrow = a_minus_b[:, -i - 1] - borrow < 0
     return 1 - borrow
+
 
 def is_equal(a, b):
     """
@@ -305,9 +314,13 @@ def multi_is_greater_or_equal_base_p(a_arrays, b_arrays):
     if diff == 0:
         return multi_is_greater_or_equal(a_arrays, b_arrays)
     if diff > 0:
-        return multi_is_greater_or_equal(a_arrays, b_arrays[:,diff:]) & (np.sum(b_arrays[:,0:diff]) == 0)
+        return multi_is_greater_or_equal(a_arrays, b_arrays[:, diff:]) & (
+            np.sum(b_arrays[:, 0:diff]) == 0
+        )
 
-    return multi_is_greater_or_equal(a_arrays[:,-diff:], b_arrays) | (np.sum(a_arrays[:,0:-diff]) > 0)    
+    return multi_is_greater_or_equal(a_arrays[:, -diff:], b_arrays) | (
+        np.sum(a_arrays[:, 0:-diff]) > 0
+    )
 
 
 def insert_array_at_index(a, B, i, j):
@@ -324,18 +337,19 @@ def insert_array_at_index(a, B, i, j):
     # Insert elements from a into B[i]
     B[i, j : j + n] = a[:n]
 
+
 def insert_array_at_index_3D(A, B, i, j):
     """
     Tensorized version of insert_array_at_index
-    Insert elements of 2D array A into 3D array B[:,i,j:]    
+    Insert elements of 2D array A into 3D array B[:,i,j:]
     """
     # Case when j is negative
     if j < 0:
         # We will take elements of a starting at index -j
-        A = A[:,-j:]
+        A = A[:, -j:]
         j = 0
     # Compute the number of elements we can insert from a into b
-    n = min(B[0,i].size - j, A[0].size)
+    n = min(B[0, i].size - j, A[0].size)
     # Insert elements from a into B[i]
     B[:, i, j : j + n] = A[:, :n]
 

@@ -1,5 +1,6 @@
 """
-This module implements a matrix inversion algorithm for encrypted matrices of QFloats
+This module implements a matrix inversion algorithm
+for encrypted matrices of QFloats
 
 The pure python version of the algorithm working on floats is also provided for clear understanding
 and comparing, as well as testing functions when using this module as a main
@@ -16,17 +17,13 @@ from concrete import fhe
 Tracer = fhe.tracing.tracer.Tracer
 
 
-# ============================================================================================================================================
+"""
+==============================================================================
 
-#  ██████  ██████  ██  ██████  ██ ███    ██  █████  ██          ██      ██    ██     ██ ███    ██ ██    ██ ███████ ██████  ███████ ███████
-# ██    ██ ██   ██ ██ ██       ██ ████   ██ ██   ██ ██          ██      ██    ██     ██ ████   ██ ██    ██ ██      ██   ██ ██      ██
-# ██    ██ ██████  ██ ██   ███ ██ ██ ██  ██ ███████ ██          ██      ██    ██     ██ ██ ██  ██ ██    ██ █████   ██████  ███████ █████
-# ██    ██ ██   ██ ██ ██    ██ ██ ██  ██ ██ ██   ██ ██          ██      ██    ██     ██ ██  ██ ██  ██  ██  ██      ██   ██      ██ ██
-#  ██████  ██   ██ ██  ██████  ██ ██   ████ ██   ██ ███████     ███████  ██████      ██ ██   ████   ████   ███████ ██   ██ ███████ ███████
+Original LU matrix inversion algorithm operating on floats
 
-# the python algorithm operating on floats for inverting matrices
-
-# ============================================================================================================================================
+==============================================================================
+"""
 
 
 def pivot_matrix(M):
@@ -131,23 +128,18 @@ def test_matrix_inverse(n, m=100):
     print("test_matrix_inverse OK")
 
 
-# ============================================================================================================================================
+"""
+==============================================================================
 
-#  ██████  ███████ ██       ██████   █████  ████████     ███████ ██    ██ ███    ██  ██████ ████████ ██  ██████  ███    ██ ███████
-# ██    ██ ██      ██      ██    ██ ██   ██    ██        ██      ██    ██ ████   ██ ██         ██    ██ ██    ██ ████   ██ ██
-# ██    ██ █████   ██      ██    ██ ███████    ██        █████   ██    ██ ██ ██  ██ ██         ██    ██ ██    ██ ██ ██  ██ ███████
-# ██ ▄▄ ██ ██      ██      ██    ██ ██   ██    ██        ██      ██    ██ ██  ██ ██ ██         ██    ██ ██    ██ ██  ██ ██      ██
-#  ██████  ██      ███████  ██████  ██   ██    ██        ██       ██████  ██   ████  ██████    ██    ██  ██████  ██   ████ ███████
-#     ▀▀
+QFloat version of LU matrix inversion algorithm, thus operating on QFloats
 
-# the same functions working on QFloats instead of floats
-
-# ============================================================================================================================================
+==============================================================================
+"""
 
 
-########################################################################################
+###############################################################################
 #                                     UTILS
-########################################################################################
+###############################################################################
 
 
 def matrix_column(M, j):
@@ -205,7 +197,7 @@ def qfloat_list_dot_product(list1, list2):
     # )
     # result = multiplications[0]
     # for m in multiplications[1:]:
-    #     result += m  # in place addition is supported    
+    #     result += m  # in place addition is supported
 
     return result
 
@@ -215,12 +207,16 @@ def qfloat_list_matrix_multiply(matrix1, matrix2):
     Multiply two matrices of int or QFloats
     """
     # if len(matrix1[0]) != len(matrix2):
-    #     raise ValueError("Number of columns in matrix1 should match the number of rows in matrix2.")
+    #     raise ValueError(
+    #           "Number of columns in matrix1 should match the number of rows in matrix2."
+    #      )
     result = [[None] * len(matrix2[0]) for _ in range(len(matrix1))]
 
     for i in range(len(matrix1)):
         for j in range(len(matrix2[0])):
-            result[i][j] = qfloat_list_dot_product(matrix1[i], matrix_column(matrix2, j))
+            result[i][j] = qfloat_list_dot_product(
+                matrix1[i], matrix_column(matrix2, j)
+            )
 
     return result
 
@@ -229,7 +225,9 @@ def float_matrix_to_qfloat_arrays(M, qfloat_len, qfloat_ints, qfloat_base):
     """
     converts a float matrix to arrays representing qfloats
     """
-    qfloat_list = [QFloat.from_float(f, qfloat_len, qfloat_ints, qfloat_base) for f in M.flatten()]
+    qfloat_list = [
+        QFloat.from_float(f, qfloat_len, qfloat_ints, qfloat_base) for f in M.flatten()
+    ]
     n = len(qfloat_list)
     qfloat_arrays = np.zeros((n, qfloat_len), dtype="int")
     qfloat_signs = np.zeros(n, dtype="int")
@@ -240,7 +238,9 @@ def float_matrix_to_qfloat_arrays(M, qfloat_len, qfloat_ints, qfloat_base):
     return qfloat_arrays, qfloat_signs
 
 
-def qfloat_arrays_to_qfloat_matrix(qfloat_arrays, qfloat_signs, qfloat_ints, qfloat_base):
+def qfloat_arrays_to_qfloat_matrix(
+    qfloat_arrays, qfloat_signs, qfloat_ints, qfloat_base
+):
     """
     converts qfloats array and sign array to a QFloat matrix
     """
@@ -250,7 +250,13 @@ def qfloat_arrays_to_qfloat_matrix(qfloat_arrays, qfloat_signs, qfloat_ints, qfl
     for i in range(n):
         row = []
         for j in range(n):
-            qfloat = QFloat(qfloat_arrays[index, :], qfloat_ints, qfloat_base, True, qfloat_signs[index])
+            qfloat = QFloat(
+                qfloat_arrays[index, :],
+                qfloat_ints,
+                qfloat_base,
+                True,
+                qfloat_signs[index],
+            )
             index += 1
             row.append(qfloat)
         qfloat_M.append(row)
@@ -268,7 +274,11 @@ def qfloat_and_signs_arrays_to_float_matrix(qfloat_arrays, qfloat_ints, qfloat_b
     for i in range(n):
         for j in range(n):
             M[i, j] = QFloat(
-                qfloat_arrays[index, :-1], qfloat_ints, qfloat_base, True, qfloat_arrays[index, -1]
+                qfloat_arrays[index, :-1],
+                qfloat_ints,
+                qfloat_base,
+                True,
+                qfloat_arrays[index, -1],
             ).to_float()
             index += 1
 
@@ -301,9 +311,9 @@ def qfloat_matrix_to_arrays_and_signs(M, qfloat_len, qfloat_ints, qfloat_base):
     return qfloat_arrays
 
 
-########################################################################################
+###############################################################################
 #                                   PIVOT MATRIX
-########################################################################################
+###############################################################################
 
 
 def qfloat_argmax(indices, qfloats):
@@ -361,9 +371,9 @@ def qfloat_pivot_matrix(M):
     return pivot_mat
 
 
-########################################################################################
+###############################################################################
 #                                   LU DECOMPOSITION
-########################################################################################
+###############################################################################
 
 
 def qfloat_lu_decomposition(M, qfloat_len, qfloat_ints, true_division=False):
@@ -371,7 +381,8 @@ def qfloat_lu_decomposition(M, qfloat_len, qfloat_ints, true_division=False):
     Perform a LU decomposition of square (QFloats 2D-list) matrix M
     The function returns P, L, and U such that M = PLU.
 
-    true_division: Wether to compute true divisions instead of multiplying by inverse. Setting it to True is more precise but slower
+    true_division: Wether to compute true divisions instead of multiplying by inverse.
+    Setting it to True is more precise but slower
     """
     assert len(M) == len(M[0])
     n = len(M)
@@ -407,9 +418,9 @@ def qfloat_lu_decomposition(M, qfloat_len, qfloat_ints, true_division=False):
 
         # l_{ij} = \frac{1}{u_{jj}} (a_{ij} - \sum_{k=1}^{j-1} u_{kj} l_{ik})
         if not true_division:
-            inv_Ujj = U[j][j].invert(
-                1, qfloat_len, 0
-            )  # compute one precise invert division and then use multiplications, faster but less precise
+            # compute one precise invert division and then use multiplications
+            # this is faster but less precise
+            inv_Ujj = U[j][j].invert(1, qfloat_len, 0)
         for i in range(j + 1, n):
             if j > 0:
                 s2 = qfloat_list_dot_product(
@@ -428,7 +439,9 @@ def qfloat_lu_decomposition(M, qfloat_len, qfloat_ints, true_division=False):
                 if true_division:
                     L[i][j] = PM[i][j] / U[j][j]
                 else:
-                    L[i][j] = QFloat.from_mul(PM[i][j], inv_Ujj, qfloat_len, qfloat_ints)
+                    L[i][j] = QFloat.from_mul(
+                        PM[i][j], inv_Ujj, qfloat_len, qfloat_ints
+                    )
 
     # for now, PM = LU
     P = transpose_2D_list(P)
@@ -436,16 +449,19 @@ def qfloat_lu_decomposition(M, qfloat_len, qfloat_ints, true_division=False):
     return P, L, U
 
 
-########################################################################################
+###############################################################################
 #                                   LU INVERSE
-########################################################################################
+###############################################################################
 
 
-def qfloat_lu_inverse(P, L, U, qfloat_len, qfloat_ints, true_division=False, debug=False):
+def qfloat_lu_inverse(
+    P, L, U, qfloat_len, qfloat_ints, true_division=False, debug=False
+):
     """
     Compute inverse using the P,L,U decomposition (operating on QFloats 2D-lists)
 
-    true_division: Wether to compute true divisions instead of multiplying by inverse. Setting it to True is more precise but slower
+    true_division: Wether to compute true divisions instead of multiplying by inverse.
+    Setting it to True is more precise but slower
     """
     n = len(L)
 
@@ -494,10 +510,9 @@ def qfloat_lu_inverse(P, L, U, qfloat_len, qfloat_ints, true_division=False, deb
         return transpose_2D_list(X), Y, X  # return Y and X for debug purpose
 
 
-########################################################################################
+###############################################################################
 #                               2x2 SHORCUT FORMULA
-########################################################################################
-
+###############################################################################
 
 
 def qfloat_inverse_2x2(qfloat_M, qfloat_len, qfloat_ints):
@@ -508,19 +523,25 @@ def qfloat_inverse_2x2(qfloat_M, qfloat_len, qfloat_ints):
     [a, b] = qfloat_M[0]
     [c, d] = qfloat_M[1]
 
-    ad = QFloat.from_mul(a,d, 2*qfloat_ints+3, 2*qfloat_ints) # produces a longer integer part
-    bc = QFloat.from_mul(b,c, 2*qfloat_ints+3, 2*qfloat_ints) # produces a longer integer part
+    ad = QFloat.from_mul(
+        a, d, 2 * qfloat_ints + 3, 2 * qfloat_ints
+    )  # produces a longer integer part
+    bc = QFloat.from_mul(
+        b, c, 2 * qfloat_ints + 3, 2 * qfloat_ints
+    )  # produces a longer integer part
 
-    det = ad + bc.neg() # determinant of M in 17 bits
+    det = ad + bc.neg()  # determinant of M in 17 bits
 
     det_inv = det.invert(
         1, qfloat_len, 0
-    ) # computes invert with a lot of decimals but no integer part
+    )  # computes invert with a lot of decimals but no integer part
 
-    mul = lambda x,y: QFloat.from_mul(x, y, qfloat_len, qfloat_ints) # multiply to output format
+    mul = lambda x, y: QFloat.from_mul(
+        x, y, qfloat_len, qfloat_ints
+    )  # multiply to output format
     M_inv = [
         [mul(d, det_inv), mul(b, det_inv).neg()],
-        [mul(c, det_inv).neg(), mul(a, det_inv)]
+        [mul(c, det_inv).neg(), mul(a, det_inv)],
     ]
 
     return M_inv
@@ -536,7 +557,7 @@ def qfloat_inverse_2x2_multi(qfloat_M, qfloat_len, qfloat_ints):
     [c, d] = qfloat_M[1]
 
     [ad, bc] = QFloat.multi_from_mul(
-        [a,b], [d,c], 2 * qfloat_ints + 3, 2 * qfloat_ints
+        [a, b], [d, c], 2 * qfloat_ints + 3, 2 * qfloat_ints
     )  # produces a longer integer part
 
     det = ad + bc.neg()  # determinant of M in 17 bits
@@ -546,8 +567,8 @@ def qfloat_inverse_2x2_multi(qfloat_M, qfloat_len, qfloat_ints):
     )  # computes invert with a lot of decimals but no integer part
 
     [mula, mulb, mulc, muld] = QFloat.multi_from_mul(
-        [a, b, c, d], [det_inv]*4, qfloat_len, qfloat_ints
-    )  # produces a longer integer part 
+        [a, b, c, d], [det_inv] * 4, qfloat_len, qfloat_ints
+    )  # produces a longer integer part
 
     M_inv = [
         [muld, mulb.neg()],
@@ -557,9 +578,9 @@ def qfloat_inverse_2x2_multi(qfloat_M, qfloat_len, qfloat_ints):
     return M_inv
 
 
-########################################################################################
+###############################################################################
 #                                   COMPLETE FUNCTION
-########################################################################################
+###############################################################################
 
 
 def qfloat_pivot(qfloat_arrays, qfloat_signs, params):
@@ -572,7 +593,9 @@ def qfloat_pivot(qfloat_arrays, qfloat_signs, params):
     assert qfloat_len == qfloat_arrays.shape[1]
 
     # reconstruct the matrix of QFloats with encrypted values:
-    qfloat_M = qfloat_arrays_to_qfloat_matrix(qfloat_arrays, qfloat_signs, qfloat_ints, qfloat_base)
+    qfloat_M = qfloat_arrays_to_qfloat_matrix(
+        qfloat_arrays, qfloat_signs, qfloat_ints, qfloat_base
+    )
 
     # compute the pivot matrix
     P = qfloat_pivot_matrix(qfloat_M)
@@ -590,14 +613,22 @@ def qfloat_lu_L(qfloat_arrays, qfloat_signs, params):
     assert qfloat_len == qfloat_arrays.shape[1]
 
     # reconstruct the matrix of QFloats with encrypted values:
-    qfloat_M = qfloat_arrays_to_qfloat_matrix(qfloat_arrays, qfloat_signs, qfloat_ints, qfloat_base)
+    qfloat_M = qfloat_arrays_to_qfloat_matrix(
+        qfloat_arrays, qfloat_signs, qfloat_ints, qfloat_base
+    )
 
     # compute the LU decomposition
-    bin_P, qfloat_L, qfloat_U = qfloat_lu_decomposition(qfloat_M, qfloat_len, qfloat_ints, true_division)
+    bin_P, qfloat_L, qfloat_U = qfloat_lu_decomposition(
+        qfloat_M, qfloat_len, qfloat_ints, true_division
+    )
 
     # break the resulting QFloats into arrays:
-    qfloat_inv_arrays_L = qfloat_matrix_to_arrays_and_signs(qfloat_L, qfloat_len, qfloat_ints, qfloat_base)
-    # qfloat_inv_arrays_U = qfloat_matrix_to_arrays_and_signs(qfloat_U, qfloat_len, qfloat_ints, qfloat_base)
+    qfloat_inv_arrays_L = qfloat_matrix_to_arrays_and_signs(
+        qfloat_L, qfloat_len, qfloat_ints, qfloat_base
+    )
+    # qfloat_inv_arrays_U = qfloat_matrix_to_arrays_and_signs(
+    #     qfloat_U, qfloat_len, qfloat_ints, qfloat_base
+    # )
 
     return qfloat_inv_arrays_L
 
@@ -612,19 +643,29 @@ def qfloat_lu_U(qfloat_arrays, qfloat_signs, params):
     assert qfloat_len == qfloat_arrays.shape[1]
 
     # reconstruct the matrix of QFloats with encrypted values:
-    qfloat_M = qfloat_arrays_to_qfloat_matrix(qfloat_arrays, qfloat_signs, qfloat_ints, qfloat_base)
+    qfloat_M = qfloat_arrays_to_qfloat_matrix(
+        qfloat_arrays, qfloat_signs, qfloat_ints, qfloat_base
+    )
 
     # compute the LU decomposition
-    bin_P, qfloat_L, qfloat_U = qfloat_lu_decomposition(qfloat_M, qfloat_len, qfloat_ints, true_division)
+    bin_P, qfloat_L, qfloat_U = qfloat_lu_decomposition(
+        qfloat_M, qfloat_len, qfloat_ints, true_division
+    )
 
     # break the resulting QFloats into arrays:
-    # qfloat_inv_arrays_L = qfloat_matrix_to_arrays_and_signs(qfloat_L, qfloat_len, qfloat_ints, qfloat_base)
-    qfloat_inv_arrays_U = qfloat_matrix_to_arrays_and_signs(qfloat_U, qfloat_len, qfloat_ints, qfloat_base)
+    # qfloat_inv_arrays_L = qfloat_matrix_to_arrays_and_signs(
+    #     qfloat_L, qfloat_len, qfloat_ints, qfloat_base
+    # )
+    qfloat_inv_arrays_U = qfloat_matrix_to_arrays_and_signs(
+        qfloat_U, qfloat_len, qfloat_ints, qfloat_base
+    )
 
     return qfloat_inv_arrays_U
 
 
-def qfloat_matrix_inverse(qfloat_arrays, qfloat_signs, n, qfloat_len, qfloat_ints, qfloat_base, true_division):
+def qfloat_matrix_inverse(
+    qfloat_arrays, qfloat_signs, n, qfloat_len, qfloat_ints, qfloat_base, true_division
+):
     """
     Compute the whole inverse
     """
@@ -632,7 +673,9 @@ def qfloat_matrix_inverse(qfloat_arrays, qfloat_signs, n, qfloat_len, qfloat_int
     assert qfloat_len == qfloat_arrays.shape[1]
 
     # reconstruct the matrix of QFloats with encrypted values:
-    qfloat_M = qfloat_arrays_to_qfloat_matrix(qfloat_arrays, qfloat_signs, qfloat_ints, qfloat_base)
+    qfloat_M = qfloat_arrays_to_qfloat_matrix(
+        qfloat_arrays, qfloat_signs, qfloat_ints, qfloat_base
+    )
 
     if n == 2:
         # use shortcut formula
@@ -640,18 +683,34 @@ def qfloat_matrix_inverse(qfloat_arrays, qfloat_signs, n, qfloat_len, qfloat_int
 
     else:
         # compute the LU decomposition
-        bin_P, qfloat_L, qfloat_U = qfloat_lu_decomposition(qfloat_M, qfloat_len, qfloat_ints, true_division)
+        bin_P, qfloat_L, qfloat_U = qfloat_lu_decomposition(
+            qfloat_M, qfloat_len, qfloat_ints, true_division
+        )
 
         # compute inverse from P L U
-        qfloat_Minv = qfloat_lu_inverse(bin_P, qfloat_L, qfloat_U, qfloat_len, qfloat_ints, true_division)
+        qfloat_Minv = qfloat_lu_inverse(
+            bin_P, qfloat_L, qfloat_U, qfloat_len, qfloat_ints, true_division
+        )
 
     # break the resulting QFloats into arrays:
-    qfloat_inv_arrays = qfloat_matrix_to_arrays_and_signs(qfloat_Minv, qfloat_len, qfloat_ints, qfloat_base)
+    qfloat_inv_arrays = qfloat_matrix_to_arrays_and_signs(
+        qfloat_Minv, qfloat_len, qfloat_ints, qfloat_base
+    )
 
     return qfloat_inv_arrays
 
 
-#############################################################################################################
+"""
+==============================================================================
+
+Tests for functions in this file.
+The funcitons above can be imported from another file
+
+==============================================================================
+"""
+
+
+#######################################################################################
 
 # ████████ ███████ ███████ ████████ ███████
 #    ██    ██      ██         ██    ██
@@ -659,12 +718,13 @@ def qfloat_matrix_inverse(qfloat_arrays, qfloat_signs, n, qfloat_len, qfloat_int
 #    ██    ██           ██    ██         ██
 #    ██    ███████ ███████    ██    ███████
 
-# tests for functions in this file. The above the functions can be imported from another file
+# tests for functions in this file.
+# The above the functions can be imported from another file
 
-#############################################################################################################
+#######################################################################################
 
 
-def measure_time(function, descripton, *inputs):
+def measure_time(function, descripton, verbose, *inputs):
     # Compute a function on inputs and return output along with duration
     print(descripton + " ...", end="", flush=True)
     print("\r", end="")
@@ -672,12 +732,12 @@ def measure_time(function, descripton, *inputs):
     output = function(*inputs)
     end = time.time()
     print(f"|  {descripton} : {end-start:.2f} s  |")
-    return output
+    return output, end - start
 
 
-########################################################################################
+###############################################################################
 #                                    PYTHON
-########################################################################################
+###############################################################################
 
 
 def test_qfloat_PLU_python(M, params):
@@ -687,23 +747,37 @@ def test_qfloat_PLU_python(M, params):
     [n, qfloat_len, qfloat_ints, qfloat_base, true_division] = params
 
     # convert it to QFloat arrays
-    qfloat_arrays, qfloat_signs = float_matrix_to_qfloat_arrays(M, qfloat_len, qfloat_ints, qfloat_base)
+    qfloat_arrays, qfloat_signs = float_matrix_to_qfloat_arrays(
+        M, qfloat_len, qfloat_ints, qfloat_base
+    )
 
     # reconstruct the matrix of QFloats
-    qfloat_M = qfloat_arrays_to_qfloat_matrix(qfloat_arrays, qfloat_signs, qfloat_ints, qfloat_base)
+    qfloat_M = qfloat_arrays_to_qfloat_matrix(
+        qfloat_arrays, qfloat_signs, qfloat_ints, qfloat_base
+    )
 
     # compute the LU decomposition
-    bin_P, qfloat_L, qfloat_U = qfloat_lu_decomposition(qfloat_M, qfloat_len, qfloat_ints, true_division)
+    bin_P, qfloat_L, qfloat_U = qfloat_lu_decomposition(
+        qfloat_M, qfloat_len, qfloat_ints, true_division
+    )
 
     # convert bin_P from binaryValue to floats
     P = np.array(map_2D_list(bin_P, lambda x: x.value))
 
     # break the resulting QFloats into arrays:
-    qfloat_arrays_L = qfloat_matrix_to_arrays_and_signs(qfloat_L, qfloat_len, qfloat_ints, qfloat_base)
-    qfloat_arrays_U = qfloat_matrix_to_arrays_and_signs(qfloat_U, qfloat_len, qfloat_ints, qfloat_base)
+    qfloat_arrays_L = qfloat_matrix_to_arrays_and_signs(
+        qfloat_L, qfloat_len, qfloat_ints, qfloat_base
+    )
+    qfloat_arrays_U = qfloat_matrix_to_arrays_and_signs(
+        qfloat_U, qfloat_len, qfloat_ints, qfloat_base
+    )
 
-    L = qfloat_and_signs_arrays_to_float_matrix(qfloat_arrays_L, qfloat_ints, qfloat_base)
-    U = qfloat_and_signs_arrays_to_float_matrix(qfloat_arrays_U, qfloat_ints, qfloat_base)
+    L = qfloat_and_signs_arrays_to_float_matrix(
+        qfloat_arrays_L, qfloat_ints, qfloat_base
+    )
+    U = qfloat_and_signs_arrays_to_float_matrix(
+        qfloat_arrays_U, qfloat_ints, qfloat_base
+    )
 
     print(" PIVOT MATRIX\n============")
     print("QFloat P :")
@@ -735,17 +809,20 @@ def test_qfloat_PLU_python(M, params):
 
 
 def run_qfloat_inverse_python(M, params):
-
     [n, qfloat_len, qfloat_ints, qfloat_base, true_division] = params
 
     # convert it to QFloat arrays
-    qfloat_arrays, qfloat_signs = float_matrix_to_qfloat_arrays(M, qfloat_len, qfloat_ints, qfloat_base)
+    qfloat_arrays, qfloat_signs = float_matrix_to_qfloat_arrays(
+        M, qfloat_len, qfloat_ints, qfloat_base
+    )
 
     output = qfloat_matrix_inverse(qfloat_arrays, qfloat_signs, *params)
 
-    qfloat_Res = qfloat_and_signs_arrays_to_float_matrix(output, qfloat_ints, qfloat_base)
+    qfloat_res = qfloat_and_signs_arrays_to_float_matrix(
+        output, qfloat_ints, qfloat_base
+    )
 
-    return qfloat_Res
+    return qfloat_res
 
 
 def test_qfloat_inverse_python(M, params):
@@ -755,15 +832,17 @@ def test_qfloat_inverse_python(M, params):
     [n, qfloat_len, qfloat_ints, qfloat_base, true_division] = params
 
     # convert it to QFloat arrays
-    qfloat_arrays, qfloat_signs = float_matrix_to_qfloat_arrays(M, qfloat_len, qfloat_ints, qfloat_base)
+    qfloat_arrays, qfloat_signs = float_matrix_to_qfloat_arrays(
+        M, qfloat_len, qfloat_ints, qfloat_base
+    )
 
     start = time.time()
-    qfloat_Res = run_qfloat_inverse_python(M, params)
+    qfloat_res = run_qfloat_inverse_python(M, params)
     end = time.time()
 
     print("\n==== Test python ====")
     print("\nQFloat inverse :")
-    print(qfloat_Res)
+    print(qfloat_res)
 
     print("\nLU inverse :")
     print(matrix_inverse(M))
@@ -772,7 +851,7 @@ def test_qfloat_inverse_python(M, params):
     scres = sc.linalg.inv(M)
     print(scres)
 
-    error = np.abs(qfloat_Res - scres)
+    error = np.abs(qfloat_res - scres)
     print(f"\nAverage Error: {np.mean(error):.6f}")
     print(f"    Max Error: {np.max(error):.6f}")
     print(f"    Min Error: {np.min(error):.6f}")
@@ -795,13 +874,15 @@ def debug_qfloat_inverse_python(sampler, params, verbose=False, N=100):
         [n, qfloat_len, qfloat_ints, qfloat_base, true_division] = params
 
         # convert it to QFloat arrays
-        qfloat_arrays, qfloat_signs = float_matrix_to_qfloat_arrays(M, qfloat_len, qfloat_ints, qfloat_base)
+        qfloat_arrays, qfloat_signs = float_matrix_to_qfloat_arrays(
+            M, qfloat_len, qfloat_ints, qfloat_base
+        )
 
-        qfloat_Res = run_qfloat_inverse_python(M, params)
+        qfloat_res = run_qfloat_inverse_python(M, params)
 
         scres = sc.linalg.inv(M)
 
-        error = np.mean(np.abs(qfloat_Res - scres))
+        error = np.mean(np.abs(qfloat_res - scres))
 
         errors[i] = error
 
@@ -811,21 +892,31 @@ def debug_qfloat_inverse_python(sampler, params, verbose=False, N=100):
             if not verbose:
                 continue
 
-            err = np.abs(qfloat_Res - scres)
+            err = np.abs(qfloat_res - scres)
             print(f"\nAverage Error: {np.mean(err):.6f}")
             print(f"    Max Error: {np.max(err):.6f}")
             print(f"    Min Error: {np.min(err):.6f}")
             print(f"  Total Error: {np.sum(err):.6f}")
 
             # reconstruct the matrix of QFloats
-            qfloat_M = qfloat_arrays_to_qfloat_matrix(qfloat_arrays, qfloat_signs, qfloat_ints, qfloat_base)
+            qfloat_M = qfloat_arrays_to_qfloat_matrix(
+                qfloat_arrays, qfloat_signs, qfloat_ints, qfloat_base
+            )
 
             # compute the LU decomposition
-            bin_P, qfloat_L, qfloat_U = qfloat_lu_decomposition(qfloat_M, qfloat_len, qfloat_ints, true_division)
+            bin_P, qfloat_L, qfloat_U = qfloat_lu_decomposition(
+                qfloat_M, qfloat_len, qfloat_ints, true_division
+            )
 
             # compute the inverse
             qfloat_Minv, qfloat_Y, qfloat_X = qfloat_lu_inverse(
-                bin_P, qfloat_L, qfloat_U, qfloat_len, qfloat_ints, true_division, debug=True
+                bin_P,
+                qfloat_L,
+                qfloat_U,
+                qfloat_len,
+                qfloat_ints,
+                true_division,
+                debug=True,
             )
 
             # convert QFloat mattrices to floats
@@ -842,7 +933,7 @@ def debug_qfloat_inverse_python(sampler, params, verbose=False, N=100):
             print(U)
             print(U_)
             print("\nInv")
-            print(qfloat_Res)
+            print(qfloat_res)
             print(scres)
 
             Y = map_2D_list(qfloat_Y, lambda x: x.to_float())
@@ -859,18 +950,20 @@ def debug_qfloat_inverse_python(sampler, params, verbose=False, N=100):
     print("big error rate :" + str(100 * nerrors / N) + " %")
 
 
-########################################################################################
+###############################################################################
 #                                           FHE
-########################################################################################
+###############################################################################
 
 
-def compile_circuit(params, sampler, circuit_function):
+def compile_circuit(params, sampler, circuit_function, verbose=True):
     [n, qfloat_len, qfloat_ints, qfloat_base, true_division] = params
 
     inputset = []
     for i in range(100):
         M = sampler()
-        qfloat_arrays, qfloat_signs = float_matrix_to_qfloat_arrays(M, qfloat_len, qfloat_ints, qfloat_base)
+        qfloat_arrays, qfloat_signs = float_matrix_to_qfloat_arrays(
+            M, qfloat_len, qfloat_ints, qfloat_base
+        )
         inputset.append((qfloat_arrays, qfloat_signs))
 
     compiler = fhe.Compiler(
@@ -884,44 +977,64 @@ def compile_circuit(params, sampler, circuit_function):
             use_insecure_key_cache=True,
             insecure_key_cache_location=".keys",
             single_precision=False,
+            show_graph=False,
             # dataflow_parallelize=True,
         ),
         verbose=False,
     )
 
-    circuit = measure_time(make_circuit, "Compiling")
-    return circuit
+    circuit, time = measure_time(make_circuit, "Compiling", verbose)
+    return circuit, time
 
 
 def run_qfloat_circuit_fhe(
-    circuit, M, qfloat_len, qfloat_ints, qfloat_base, simulate=False, raw_output=False
+    circuit, M, qfloat_len, qfloat_ints, qfloat_base, simulate=False, raw_output=False, verbose=True
 ):
     # convert it to QFloat arrays
-    qfloat_arrays, qfloat_signs = float_matrix_to_qfloat_arrays(M, qfloat_len, qfloat_ints, qfloat_base)
+    qfloat_arrays, qfloat_signs = float_matrix_to_qfloat_arrays(
+        M, qfloat_len, qfloat_ints, qfloat_base
+    )
+
+    simulation_time = None
+    encryption_time = None
+    running_time = None
 
     # Run FHE
     if not simulate:
-        encrypted = measure_time(circuit.encrypt, "Encrypting", qfloat_arrays, qfloat_signs)
-        run = measure_time(circuit.run, "Running", encrypted)
+        encrypted, encryption_time = measure_time(
+            circuit.encrypt, "Encrypting", verbose, qfloat_arrays, qfloat_signs
+        )
+        run, running_time = measure_time(circuit.run, "Running", verbose, encrypted)
         decrypted = circuit.decrypt(run)
 
     else:
-        decrypted = measure_time(circuit.simulate, "Simulating", qfloat_arrays, qfloat_signs)
+        decrypted, simulation_time = measure_time(
+            circuit.simulate, "Simulating", verbose, qfloat_arrays, qfloat_signs
+        )
 
     if raw_output:
-        return decrypted
+        return decrypted, (simulation_time, encryption_time, running_time)
 
-    return qfloat_and_signs_arrays_to_float_matrix(decrypted, qfloat_ints, qfloat_base)
+    result = qfloat_and_signs_arrays_to_float_matrix(
+        decrypted, qfloat_ints, qfloat_base
+    )
+
+    if not simulate:
+        return result, (encryption_time, running_time)
+    else:
+        return result, simulation_time
 
 
 def test_qfloat_pivot_fhe(circuit, M, params, simulate=False):
     [n, qfloat_len, qfloat_ints, qfloat_base, true_division] = params
-    qfloat_Res = run_qfloat_circuit_fhe(circuit, M, qfloat_len, qfloat_ints, qfloat_base, simulate, True)
+    qfloat_res, _ = run_qfloat_circuit_fhe(
+        circuit, M, qfloat_len, qfloat_ints, qfloat_base, simulate, True
+    )
     if simulate:
         print("SIMULATING\n")
 
     print("QFloat pivot :")
-    print(qfloat_Res)
+    print(qfloat_res)
     print(" ")
 
     print("LU pivot :")
@@ -931,13 +1044,15 @@ def test_qfloat_pivot_fhe(circuit, M, params, simulate=False):
 
 def test_qfloat_LU_U_fhe(circuit, M, params, simulate=False):
     [n, qfloat_len, qfloat_ints, qfloat_base, true_division] = params
-    qfloat_Res = run_qfloat_circuit_fhe(circuit, M, qfloat_len, qfloat_ints, qfloat_base, simulate)
+    qfloat_res, _ = run_qfloat_circuit_fhe(
+        circuit, M, qfloat_len, qfloat_ints, qfloat_base, simulate
+    )
 
     if simulate:
         print("SIMULATING")
 
     print("QFloat LU U :")
-    print(qfloat_Res)
+    print(qfloat_res)
     print(" ")
 
     print("LU U :")
@@ -948,12 +1063,14 @@ def test_qfloat_LU_U_fhe(circuit, M, params, simulate=False):
 
 def test_qfloat_LU_L_fhe(circuit, M, params, simulate=False):
     [n, qfloat_len, qfloat_ints, qfloat_base, true_division] = params
-    qfloat_Res = run_qfloat_circuit_fhe(circuit, M, qfloat_len, qfloat_ints, qfloat_base, simulate)
+    qfloat_res, _ = run_qfloat_circuit_fhe(
+        circuit, M, qfloat_len, qfloat_ints, qfloat_base, simulate
+    )
     if simulate:
         print("SIMULATING")
 
     print("QFloat LU L :")
-    print(qfloat_Res)
+    print(qfloat_res)
     print(" ")
 
     print("LU L :")
@@ -962,7 +1079,7 @@ def test_qfloat_LU_L_fhe(circuit, M, params, simulate=False):
     print(" ")
 
 
-def test_qfloat_inverse_fhe(circuit, M, params):
+def test_qfloat_inverse_fhe(circuit, M, params, simulate=False, verbose=True):
     [n, qfloat_len, qfloat_ints, qfloat_base, true_division] = params
 
     print("\nScipy inv :")
@@ -972,26 +1089,38 @@ def test_qfloat_inverse_fhe(circuit, M, params):
     print("\nQFloat inverse (Python):")
     print(run_qfloat_inverse_python(M, params))
 
-    qfloat_Res = run_qfloat_circuit_fhe(circuit, M, qfloat_len, qfloat_ints, qfloat_base, True)
+    if simulate:
+        qfloat_res, simulation_time = run_qfloat_circuit_fhe(
+            circuit, M, qfloat_len, qfloat_ints, qfloat_base, True
+        )
 
-    print("\nQFloat inverse (simulating):")
-    print(qfloat_Res)
-    print(" ")
+        print("\nQFloat inverse (simulating):")
+        print(qfloat_res)
+        print(" ")
 
-    qfloat_Res = run_qfloat_circuit_fhe(circuit, M, qfloat_len, qfloat_ints, qfloat_base, False)
+    qfloat_res, (compilation_time, running_time) = run_qfloat_circuit_fhe(
+        circuit, M, qfloat_len, qfloat_ints, qfloat_base, False
+    )
 
     print("\nQFloat inverse (FHE) :")
-    print(qfloat_Res)
+    print(qfloat_res)
     print(" ")
 
-    error = np.abs(qfloat_Res - scres)
+    error = np.abs(qfloat_res - scres)
     print(f"\nAverage Error: {np.mean(error):.6f}")
     print(f"    Max Error: {np.max(error):.6f}")
     print(f"    Min Error: {np.min(error):.6f}")
     print(f"  Total Error: {np.sum(error):.6f}")
 
+    if simulate:
+        return simulation_time
 
-# TODO: test with higher bases and smaller arrays (should be faster to compile and run, slower to encrypt), currently their is a bug in concrete.
+    return (compilation_time, running_time)
+
+
+# TODO: test with higher bases and smaller arrays
+# (should be faster to compile and run, slower to encrypt),
+# currently their is a bug in concrete.
 
 if __name__ == "__main__":
     # n=2; qfloat_base = 2; qfloat_len = 23; qfloat_ints = 9;
@@ -1007,15 +1136,28 @@ if __name__ == "__main__":
     qfloat_ints = 9
     # n=5; qfloat_base = 2; qfloat_len = 23; qfloat_ints = 9;
 
-    # intermediate precision
-    true_division = False
-    # n=3; qfloat_base = 2; qfloat_len = 31; qfloat_ints = 16;
+    # # intermediate precision
+    # true_division = False
+    # n=2;
+    # qfloat_base = 2;
+    # qfloat_len = 31;
+    # qfloat_ints = 16;
     # n=4; qfloat_base = 2; qfloat_len = 31; qfloat_ints = 16;
     # n=3; qfloat_base = 16; qfloat_len = 5; qfloat_ints = 3; # CONCRETE BUG
 
     # higher precision
     # true_division = True
-    # n=3; qfloat_base = 2; qfloat_len = 31; qfloat_ints = 16;
+    # n=2;
+    # qfloat_base = 2;
+    # qfloat_len = 31;
+    # qfloat_ints = 16;
+
+    # high precision
+    # true_division = True
+    # n=10;
+    # qfloat_base = 2;
+    # qfloat_len = 40;
+    # qfloat_ints = 20;
 
     normal_sampler = ("Normal", lambda: np.random.randn(n, n) * 100)
     uniform_sampler = ("Uniform", lambda: np.random.uniform(0, 100, (n, n)))
@@ -1023,17 +1165,18 @@ if __name__ == "__main__":
     sampler = normal_sampler[1]
     # sampler = uniform_sampler[1]
 
-    # gen random matrix
-    M = sampler()
-
-    print("Test for Matrix :\n==================")
-    print(M)
-    print("")
-
     params = [n, qfloat_len, qfloat_ints, qfloat_base, true_division]
 
-    # debug
+    # # debug
     # debug_qfloat_inverse_python(sampler, params, verbose=False, N=1000)
+    # exit()
+
+    # # gen random matrix
+    # M = sampler()
+
+    # print("Test for Matrix :\n==================")
+    # print(M)
+    # print("")
 
     # test PLU qf python
     # ----------------------
@@ -1041,39 +1184,79 @@ if __name__ == "__main__":
 
     # test inverse qf python
     # ----------------------
-    QFloat.reset_stats()
-    test_qfloat_inverse_python(M, params)
-    QFloat.show_stats()
+    # QFloat.reset_stats()
+    # test_qfloat_inverse_python(M, params)
+    # QFloat.show_stats()
 
     # test pivot in fhe:
     # ------------------
     # QFloat.reset_stats()
-    # circuit = compile_circuit(params, sampler, qfloat_pivot)
+    # circuit, compilation_time = compile_circuit(params, sampler, qfloat_pivot)
     # QFloat.show_stats()
     # test_qfloat_pivot_fhe(circuit, M, params, False)
 
     # test LU U decomposition in fhe:
     # -----------------------------
     # QFloat.reset_stats()
-    # circuit = compile_circuit(params, sampler, qfloat_lu_U)
+    # circuit, compilation_time = compile_circuit(params, sampler, qfloat_lu_U)
     # QFloat.show_stats()
     # test_qfloat_LU_U_fhe(circuit, M, params, False)
 
     # test LU L decomposition in fhe:
     # -----------------------------
     # QFloat.reset_stats()
-    # circuit = compile_circuit(params, sampler, qfloat_lu_L)
+    # circuit, compilation_time = compile_circuit(params, sampler, qfloat_lu_L)
     # QFloat.show_stats()
     # test_qfloat_LU_L_fhe(circuit, M, params, simulate=True)
 
     # test inversion in fhe:
     # -----------------------------
-    start = time.time()
+    # start = time.time()
 
-    QFloat.reset_stats()
-    circuit = compile_circuit(params, sampler, qfloat_matrix_inverse)
-    QFloat.show_stats()
-    test_qfloat_inverse_fhe(circuit, M, params)
+    # QFloat.reset_stats()
+    # circuit, compilation_time = compile_circuit(params, sampler, qfloat_matrix_inverse)
+    # QFloat.show_stats()
+    # test_qfloat_inverse_fhe(circuit, M, params)
 
-    end = time.time()
-    print(f"|  Total time : {end-start:.2f} s  |")
+    # end = time.time()
+    # print(f"|  Total time : {end-start:.2f} s  |")
+
+    ## benchmarking
+    def write_file(text, erase=False):
+        with open("./log-nothing.txt", "a") as file:
+            if erase:
+                file.truncate(0)
+            file.write(text)
+
+    write_file('', True)
+
+    for n in [2, 3, 5]:
+        params[0] = n
+        times = []
+        write_file("Benchmark for n = " + str(n) + "\n")
+
+        for k in range(3):
+            M = sampler()
+
+            start = time.time()
+
+            circuit, compilation_time = compile_circuit(
+                params, sampler, qfloat_matrix_inverse, False
+            )
+
+            # write the time
+            write_file(str(k+1)+"\n")
+            write_file("compilation :" + str(compilation_time) + "\n")
+
+            (compilation_time, running_time) = test_qfloat_inverse_fhe(circuit, M, params, False)
+
+            end = time.time()
+            current_time = end - start
+
+            times.append(current_time)
+
+            write_file("running     :" + str(running_time) + "\n")
+            write_file("total       :" + str(current_time) + "\n")
+
+        # write the mean time
+        write_file("\nmean :" + str(np.mean(np.array(times))) + "\n\n\n")

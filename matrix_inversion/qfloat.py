@@ -117,8 +117,6 @@ class Zero:
         return self
 
 
-
-
 class SignedBinary:
     """
     A simple class to differentiate values that we know are binary (+1, -1 or 0) from others
@@ -161,7 +159,7 @@ class SignedBinary:
         """
         Setter of encrypted
         """
-        raise ValueError('Setting this variables from outside is forbidden')
+        raise ValueError("Setting this variables from outside is forbidden")
 
     def copy(self):
         """
@@ -242,8 +240,6 @@ class SignedBinary:
         Return a copy of the object with positive sign
         """
         return SignedBinary(np.abs(self._value))
-
-
 
 
 class QFloat:
@@ -431,7 +427,7 @@ class QFloat:
         """
         Setter of ints
         """
-        raise ValueError('Setting this variables from outside is forbidden')
+        raise ValueError("Setting this variables from outside is forbidden")
 
     @property
     def base(self):
@@ -445,7 +441,7 @@ class QFloat:
         """
         Setter of base
         """
-        raise ValueError('Setting this variables from outside is forbidden')
+        raise ValueError("Setting this variables from outside is forbidden")
 
     @property
     def is_base_tidy(self):
@@ -459,7 +455,7 @@ class QFloat:
         """
         Setter of is_base_tidy
         """
-        raise ValueError('Setting this variables from outside is forbidden')
+        raise ValueError("Setting this variables from outside is forbidden")
 
     @property
     def array(self):
@@ -473,7 +469,7 @@ class QFloat:
         """
         Setter of array
         """
-        raise ValueError('Setting this variables from outside is forbidden')
+        raise ValueError("Setting this variables from outside is forbidden")
 
     @property
     def encrypted(self):
@@ -487,7 +483,7 @@ class QFloat:
         """
         Setter of encrypted
         """
-        raise ValueError('Setting this variables from outside is forbidden')
+        raise ValueError("Setting this variables from outside is forbidden")
 
     @property
     def sign(self):
@@ -501,7 +497,7 @@ class QFloat:
         """
         Setter of sign
         """
-        raise ValueError('Setting this variables from outside is forbidden')
+        raise ValueError("Setting this variables from outside is forbidden")
 
     @classmethod
     def zero(cls, length, ints, base, encrypted=True):
@@ -639,10 +635,10 @@ class QFloat:
 
         dividends = fhe.zeros(arrays.shape[0])
         for i in reversed(range(arrays.shape[1])):
-            curr = arrays[:,i] + dividends
+            curr = arrays[:, i] + dividends
             dividends = (np.abs(curr) // base) * np.sign(curr)
             curr -= dividends * base
-            arrays[:,i] = curr[:]
+            arrays[:, i] = curr[:]
 
         # TODO: keep track of overflow
         # QFloat.OVERFLOW = np.any(dividends)
@@ -669,8 +665,9 @@ class QFloat:
 
         P_minus_abs_N, is_negative = bpa.base_p_subtraction(P, abs_N, self._base, True)
         is_positive_or_0 = 1 - is_negative
-        self._array = is_positive_or_0 * P_minus_abs_N + is_negative * bpa.base_p_subtraction(
-            abs_N, P, self._base
+        self._array = (
+            is_positive_or_0 * P_minus_abs_N
+            + is_negative * bpa.base_p_subtraction(abs_N, P, self._base)
         )
 
         self._sign = 2 * is_positive_or_0 - 1
@@ -920,7 +917,7 @@ class QFloat:
             for i in range(self._ints, n):
                 mularray[i, 1 + i - self._ints :] = (
                     self._array[i] * other._array[0 : n - (i - self._ints) - 1]
-                )            
+                )
 
             # the multiplication array is made from the sum of the muarray rows
             self._array = np.sum(mularray, axis=0)
@@ -1007,8 +1004,8 @@ class QFloat:
             cls.MULTIPLICATION += 1  # count only multiplications with other Qfloat
 
             # QFloats should always be base tidy before a multiplication
-            assert(a.is_base_tidy)
-            assert(b.is_base_tidy)
+            assert a.is_base_tidy
+            assert b.is_base_tidy
 
             # convert a to encrypted if needed
             cls.check_convert_fhe(a, b.encrypted)
@@ -1067,27 +1064,29 @@ class QFloat:
         a0 = list_a[0]
         b0 = list_b[0]
         # make sure both the lists and arrays have all the same sizes and bases:
-        assert(len(list_a) == len(list_b))
+        assert len(list_a) == len(list_b)
         for i in range(len(list_a)):
-            assert( len(list_a[i]) == len(a0) )
-            assert( len(list_b[i]) == len(a0) )
-            assert( list_a[i].base == a0.base )
-            assert( list_b[i].base == a0.base )
+            assert len(list_a[i]) == len(a0)
+            assert len(list_b[i]) == len(a0)
+            assert list_a[i].base == a0.base
+            assert list_b[i].base == a0.base
             # and check that ints are the same within a and b
-            assert( list_a[i].ints == a0.ints )
-            assert( list_b[i].ints == list_b[0].ints )                       
+            assert list_a[i].ints == a0.ints
+            assert list_b[i].ints == list_b[0].ints
 
         # QFloats should always be base tidy before a multiplication
         for a in list_a:
-            assert(not isinstance(a, cls) or a.is_base_tidy);
+            assert not isinstance(a, cls) or a.is_base_tidy
         for b in list_b:
-            assert(not isinstance(b, cls) or b.is_base_tidy);            
+            assert not isinstance(b, cls) or b.is_base_tidy
 
         # prepate the list of multiplications with None values for now
-        list_ab = [None]*len(list_a)
+        list_ab = [None] * len(list_a)
 
         # skip the easy multiplication (Zero or SignedBinary)
-        indices_qfloat_mul = [] # list the qfloat x qfloat mul that will need to be done
+        indices_qfloat_mul = (
+            []
+        )  # list the qfloat x qfloat mul that will need to be done
         for i in range(len(list_a)):
             a = list_a[i]
             b = list_b[i]
@@ -1106,28 +1105,32 @@ class QFloat:
                 indices_qfloat_mul.append(i)
 
         n_qfloat_mul = len(indices_qfloat_mul)
-        cls.MULTIPLICATION += n_qfloat_mul # count only multiplications with other Qfloat
+        cls.MULTIPLICATION += (
+            n_qfloat_mul  # count only multiplications with other Qfloat
+        )
 
         if n_qfloat_mul == 0:
             return list_ab
 
         if n_qfloat_mul == 1:
             index = indices_qfloat_mul[0]
-            list_ab[index] = cls.from_mul(list_a[index], list_b[index], newlength, newints)
+            list_ab[index] = cls.from_mul(
+                list_a[index], list_b[index], newlength, newints
+            )
             return list_ab
-        
+
         # n_qfloat_mul > 1 means we can make tensorization to gain speed :
 
         mularray = fhe.zeros((n_qfloat_mul, len(a), newlength))
 
         # concat arrays of QFloats that will be multiplied
         a_arrays = np.concatenate(
-            tuple( np.reshape(list_a[i].array,(1,-1)) for i in indices_qfloat_mul),
-            axis=0
-        )        
+            tuple(np.reshape(list_a[i].array, (1, -1)) for i in indices_qfloat_mul),
+            axis=0,
+        )
         b_arrays = np.concatenate(
-            tuple( np.reshape(list_b[i].array,(1,-1)) for i in indices_qfloat_mul),
-            axis=0
+            tuple(np.reshape(list_b[i].array, (1, -1)) for i in indices_qfloat_mul),
+            axis=0,
         )
 
         for i in range(0, len(a0)):
@@ -1142,7 +1145,7 @@ class QFloat:
                 #     mul = bpa.tensor_fast_boolean_mul(b_arrays[:,ind1:ind2], a_arrays[:,i].reshape((n_qfloat_mul,1)))
                 # else:
                 #     mul = b_arrays[:,ind1:ind2] * a_arrays[:,i].reshape((n_qfloat_mul,1))
-                mul = b_arrays[:,ind1:ind2] * a_arrays[:,i].reshape((n_qfloat_mul,1))
+                mul = b_arrays[:, ind1:ind2] * a_arrays[:, i].reshape((n_qfloat_mul, 1))
 
                 # if ind2 - ind1 == 1:
                 #     mul = mul.reshape((n_qfloat_mul,1))
@@ -1159,7 +1162,11 @@ class QFloat:
             index = indices_qfloat_mul[i]
             # fill a QFloat from the results (which are tidy)
             multiplication = QFloat(
-                sum_array[i], newints, a0.base, True, list_a[index].sign * list_b[index].sign
+                sum_array[i],
+                newints,
+                a0.base,
+                True,
+                list_a[index].sign * list_b[index].sign,
             )
             # multiplication = QFloat(
             #     sum_array[i], newints, a0.base, True, list_a[index].sign * list_b[index].sign
@@ -1167,11 +1174,10 @@ class QFloat:
             # multiplication.base_tidy()
 
             # put result in the list
-            assert(list_ab[indices_qfloat_mul[i]] is None) # just to be sure
+            assert list_ab[indices_qfloat_mul[i]] is None  # just to be sure
             list_ab[index] = multiplication
 
         return list_ab
-
 
     def __itruediv__(self, other):
         """
@@ -1203,12 +1209,12 @@ class QFloat:
             return self
 
         # other must be tidy before division
-        assert(other.is_base_tidy)
+        assert other.is_base_tidy
 
         QFloat.DIVISION += 1  # count only divisions with other Qfloat
         self.check_compatibility(other)
         # must be tidy before division
-        assert(self._is_base_tidy)
+        assert self._is_base_tidy
 
         # The float precision is the number of digits after the dot:
         fp = len(self) - self._ints
@@ -1266,7 +1272,7 @@ class QFloat:
         QFloat.DIVISION += 1  # this division is counted because it is heavy
 
         # must be base tidy before dividing
-        assert(self._is_base_tidy)
+        assert self._is_base_tidy
 
         if newlength is None:
             newlength = len(self)
@@ -1314,11 +1320,11 @@ class QFloat:
 
         qf0 = list_qfloats[0]
         for qfloat in list_qfloats:
-            assert(isinstance(qfloat, cls))
-            assert(qfloat.is_base_tidy)
-            assert(len(qfloat) == len(qf0))
-            assert(qfloat.base == qf0.base)
-            assert(qfloat.ints == qf0.ints)
+            assert isinstance(qfloat, cls)
+            assert qfloat.is_base_tidy
+            assert len(qfloat) == len(qf0)
+            assert qfloat.base == qf0.base
+            assert qfloat.ints == qf0.ints
 
         n_qfloats = len(list_qfloats)
 
@@ -1329,11 +1335,13 @@ class QFloat:
         if newints is None:
             newints = qf0.ints
 
-        a_arrays = fhe.ones((n_qfloats,1))  # arrays with one value to save computations
+        a_arrays = fhe.ones(
+            (n_qfloats, 1)
+        )  # arrays with one value to save computations
         b_arrays = np.concatenate(
-            tuple( np.reshape(list_qfloats[i].array,(1,-1)) for i in range(n_qfloats)),
-            axis=0
-        )  
+            tuple(np.reshape(list_qfloats[i].array, (1, -1)) for i in range(n_qfloats)),
+            axis=0,
+        )
 
         # The float precision is the number of digits after the dot:
         fp = newlength - newints  # new float precision
@@ -1342,22 +1350,26 @@ class QFloat:
         # We consider each array as representing integers a and b here
         # Let's left shit the first array which corresponds by multiplying
         # a by 2^(fpself + fp) (decimals of old+new precision):
-        shift_arr = np.concatenate((a_arrays, fhe.zeros((n_qfloats, fpself + fp))), axis=1)
+        shift_arr = np.concatenate(
+            (a_arrays, fhe.zeros((n_qfloats, fpself + fp))), axis=1
+        )
         # Make the integer division (a*fp)/b with our long division algorithm:
         div_array = bpa.multi_base_p_division(shift_arr, b_arrays, qf0.base)
 
         # Correct size of div_array
         diff = newlength - div_array.shape[1]
         if diff > 0:
-            div_array = np.concatenate((fhe.zeros((n_qfloats,diff)), div_array), axis=1)
+            div_array = np.concatenate(
+                (fhe.zeros((n_qfloats, diff)), div_array), axis=1
+            )
         else:
-            div_array = div_array[:,-diff:]
+            div_array = div_array[:, -diff:]
         # The result array encodes for a QFloat with fp precision,
         # which is equivalent to divide the result by fp,
         # giving as expected the number (a * fp) / b / fp :
         results = []
         for i in range(n_qfloats):
             newsign = sign * list_qfloats[i].sign
-            results.append( QFloat(div_array[i,:], newints, qf0.base, True, newsign) )
+            results.append(QFloat(div_array[i, :], newints, qf0.base, True, newsign))
 
-        return results        
+        return results
