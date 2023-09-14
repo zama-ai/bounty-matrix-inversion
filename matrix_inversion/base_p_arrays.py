@@ -82,8 +82,9 @@ def float_to_base_p(f, precision, p):
 def base_p_addition(a, b, p, inplace=False):
     """
     Add arrays in base p. (a and b must be positive and tidy)
-    If a and b have different sizes, the longer array is
-    considered to have extra zeros to the left
+    
+    WARNING: If a and b have different sizes, the longer array is
+    considered to have zeros on its left side
 
     if inplace is True, the result is written is a
     """
@@ -102,14 +103,11 @@ def base_p_addition(a, b, p, inplace=False):
     return result
 
 
-def base_p_subtraction_overflow(a, b, p):
+def base_p_subtraction(a, b, p, overflow=False):
     """
     Subtract arrays in base p. (a and b must be tidy)
 
-    If a and b have different sizes, the longer array is considered
-    to have extra zeros to the left
-
-    If a < b, the result is wrong and full of ones on the left part,
+    If a < b, the difference is wrong and full of ones on the left part,
     so we can return in addition wether a < b
     """
     min_size = min(a.size, b.size)
@@ -121,14 +119,27 @@ def base_p_subtraction_overflow(a, b, p):
         temp = a_minus_b[-i - 1] - borrow
         borrow = temp < 0
         difference[-i - 1] = temp + p * borrow
-    # overflow can only happen if b has longer length
-    overflow = borrow * 1*(a.size<=b.size)
-    return difference, overflow
+
+    if not overflow:
+        return difference
+
+    else:
+        # now lets compute if there was an overflow (which also tell us if a < b)
+        diff = b.size - a.size
+        if diff == 0:
+            a_lt_b = borrow
+        elif diff < 0:
+            a_lt_b = borrow & (np.sum(a[0:-diff]) == 0)
+            difference[0:-diff] = a[0:-diff]
+        else:
+            a_lt_b = borrow | (np.sum(b[0:diff]) > 0)
+
+        return difference, a_lt_b
 
 
-def multi_base_p_subtraction_overflow(a_arrays, b_arrays, p):
+def multi_base_p_subtraction(a_arrays, b_arrays, p, overflow=False):
     """
-    Tensorized version of base_p_subtraction_overflow
+    Tensorized version of base_p_subtraction
     """
     min_size = min(a_arrays.shape[1], b_arrays.shape[1])
     difference = fhe.zeros(a_arrays.shape)
@@ -139,25 +150,23 @@ def multi_base_p_subtraction_overflow(a_arrays, b_arrays, p):
         temp = a_minus_b[:,-i - 1] - borrow
         borrow = temp < 0
         difference[:, -i - 1] = temp + p * borrow
-    # overflow can only happen if b has longer length
-    overflow = borrow * 1*(a.size<=b.size)
-    return difference, overflow
 
+    if not overflow:
+        return difference
 
-def base_p_subtraction(a, b, p):
-    """
-    Subtract arrays in base p. (a and b must be tidy, positive with a >= b)
-    Also, if they have different sizes, the longer array is considered
-    to have extra zeros to the left
-    """
-    return base_p_subtraction_overflow(a, b, p)[0]
+    else:
+        # now lets compute if there was an overflow (which also tell us if a < b)
+        diff = b_arrays.shape[1] - a_arrays.shape[1]
+        if diff == 0:
+            a_lt_b = borrow
+        elif diff < 0:
+            a_lt_b = borrow & (np.sum(a_arrays[:, 0:-diff], axis=1) == 0)
+            difference[:, 0:-diff] = a_arrays[:, 0:-diff]
+        else:
+            a_lt_b = borrow | (np.sum(b_arrays[:, 0:diff], axis=1) > 0)
 
-
-def multi_base_p_subtraction(a_arrays, b_arrays, p):
-    """
-    Tensorized version of base_p_subtraction
-    """
-    return multi_base_p_subtraction_overflow(a_arrays, b_arrays, p)[0]    
+        return difference, a_lt_b
+ 
 
 
 def base_p_division(dividend, divisor, p):
@@ -171,21 +180,22 @@ def base_p_division(dividend, divisor, p):
 
     for i in range(dividend.size):
         if i > 0:
-            # Left-roll the remainder and bring down the next bit from the dividend
+            # Left-roll the remainder and bring down the next digit from the dividend
             # also cut remainder if its size is bigger than divisor's, cause there are extra zeros
             d = 1 * (remainder.size > divisor.size)
             remainder = np.concatenate((remainder[d:], dividend[i].reshape(1)), axis=0)
         # If the remainder is larger than or equal to the divisor
         for _ in range(p - 1):
-            is_ge = is_greater_or_equal_base_p(remainder, divisor)
-            # Subtract the divisor from the remainder
+            # let's compute both remainder - divisor and remainded < divisor at once
+            difference, is_lt = base_p_subtraction(remainder, divisor, p, True)
+            is_ge = ( 1 - is_lt )
+
             remainder = (
-                # tensor_fast_boolean_mul(base_p_subtraction(remainder, divisor, p), is_ge)
-                # + tensor_fast_boolean_mul(remainder,(1 - is_ge))
-                base_p_subtraction(remainder, divisor, p) * is_ge
-                + remainder * (1 - is_ge)
-            )          
-            # Set the current quotient bit to 1
+                # tensor_fast_boolean_mul(difference, is_ge)
+                # + tensor_fast_boolean_mul(remainder, is_lt)
+                difference * is_ge + remainder * is_lt
+            )                     
+            # Update the current quotient digit
             quotient[i] += is_ge
 
     return quotient
@@ -209,17 +219,18 @@ def multi_base_p_division(dividends, divisors, p):
             remainders = np.concatenate((remainders[:,d:], dividends[:,i].reshape((n_arrays,1))), axis=1)
         # If the remainders is larger than or equal to the divisors
         for _ in range(p - 1):
-            are_ge = multi_is_greater_or_equal_base_p(remainders, divisors)
-            are_ge = are_ge.reshape((n_arrays,1))
-            # Subtract the divisors from the remainders
+            # let's compute both remainders - divisors and remainded < divisors at once
+            differences, are_lt = multi_base_p_subtraction(remainders, divisors, p, True)
+            are_lt = are_lt.reshape((n_arrays,1))
+            are_ge = ( 1 - are_lt )
+
             remainders = (
-                # tensor_fast_boolean_mul(base_p_subtraction(remainders, divisors, p), are_ge)
-                # + tensor_fast_boolean_mul(remainders,(1 - are_ge))
-                multi_base_p_subtraction(remainders, divisors, p) * are_ge
-                + remainders * (1 - are_ge)
-            )          
-            # Set the current quotient bit to 1
-            quotients[:,i] += are_ge.flatten()
+                # tensor_fast_boolean_mul(differences, are_ge)
+                # + tensor_fast_boolean_mul(remainders, are_lt)
+                differences * are_ge + remainders * are_lt
+            )                     
+            # Update the current quotient digit
+            quotients[:, i] += are_ge.flatten()
 
     return quotients
 

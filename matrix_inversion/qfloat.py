@@ -667,7 +667,7 @@ class QFloat:
         P = self._array * (self._array >= 0)
         abs_N = -1 * (self._array * (self._array < 0))
 
-        P_minus_abs_N, is_negative = bpa.base_p_subtraction_overflow(P, abs_N, self._base)
+        P_minus_abs_N, is_negative = bpa.base_p_subtraction(P, abs_N, self._base, True)
         is_positive_or_0 = 1 - is_negative
         self._array = is_positive_or_0 * P_minus_abs_N + is_negative * bpa.base_p_subtraction(
             abs_N, P, self._base
