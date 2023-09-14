@@ -121,7 +121,9 @@ def base_p_subtraction_overflow(a, b, p):
         temp = a_minus_b[-i - 1] - borrow
         borrow = temp < 0
         difference[-i - 1] = temp + p * borrow
-    return difference, borrow
+    # overflow can only happen if b has longer length
+    overflow = borrow * 1*(a.size<=b.size)
+    return difference, overflow
 
 
 def multi_base_p_subtraction_overflow(a_arrays, b_arrays, p):
@@ -137,7 +139,9 @@ def multi_base_p_subtraction_overflow(a_arrays, b_arrays, p):
         temp = a_minus_b[:,-i - 1] - borrow
         borrow = temp < 0
         difference[:, -i - 1] = temp + p * borrow
-    return difference, borrow
+    # overflow can only happen if b has longer length
+    overflow = borrow * 1*(a.size<=b.size)
+    return difference, overflow
 
 
 def base_p_subtraction(a, b, p):
