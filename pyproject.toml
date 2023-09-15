@@ -10,7 +10,7 @@ packages = [{include = "matrix_inversion"}]
 python = ">=3.9, <3.12"
 ipykernel = "^6.23.1"
 scipy = "^1.11.0"
-concrete-python = "2.1.0"
+concrete-python = "2.3.0"
 
 [build-system]
 requires = ["poetry-core"]
