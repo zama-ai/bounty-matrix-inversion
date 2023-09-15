@@ -679,7 +679,7 @@ def qfloat_matrix_inverse(
 
     if n == 2:
         # use shortcut formula
-        qfloat_Minv = qfloat_inverse_2x2_multi(qfloat_M, qfloat_len, qfloat_ints)
+        qfloat_Minv = qfloat_inverse_2x2(qfloat_M, qfloat_len, qfloat_ints)
 
     else:
         # compute the LU decomposition
