@@ -998,7 +998,7 @@ class QFloat:
                 return a * b
             # simple multiplication and size setting
             multiplication = a * b
-            multiplication.set_lenints(newlength, newints)
+            multiplication.set_len_ints(newlength, newints)
 
         else:
             cls.MULTIPLICATION += 1  # count only multiplications with other Qfloat
@@ -1061,24 +1061,55 @@ class QFloat:
         # Objects can be either QFloats, SignedBinaries or Zeros
         # We will tensorize only pairs of QFloats
 
-        a0 = list_a[0]
-        b0 = list_b[0]
+        a0 = None
+        b0 = None
+        for a in list_a:
+            if isinstance(a, cls):
+                a0 = a
+                break
+        for b in list_b:
+            if isinstance(b, cls):
+                b0 = b
+                break
+
+        if newlength is None:
+            if a0 is not None:
+                newlength=len(a0)
+            elif b0 is not None:
+                newlength=len(b0)
+
+        if newints is None:
+            if a0 is not None:
+                newints=a0.ints
+            elif b0 is not None:
+                newints=b0.ints      
+
         # make sure both the lists and arrays have all the same sizes and bases:
         assert len(list_a) == len(list_b)
-        for i in range(len(list_a)):
-            assert len(list_a[i]) == len(a0)
-            assert len(list_b[i]) == len(a0)
-            assert list_a[i].base == a0.base
-            assert list_b[i].base == a0.base
-            # and check that ints are the same within a and b
-            assert list_a[i].ints == a0.ints
-            assert list_b[i].ints == list_b[0].ints
 
-        # QFloats should always be base tidy before a multiplication
-        for a in list_a:
-            assert not isinstance(a, cls) or a.is_base_tidy
-        for b in list_b:
-            assert not isinstance(b, cls) or b.is_base_tidy
+        if a0 is not None and b0 is not None:
+            for i in range(len(list_a)):
+                if isinstance(list_a[i], cls):
+                    assert len(list_a[i]) == len(a0)
+                if isinstance(list_b[i], cls):
+                    assert len(list_b[i]) == len(a0)
+                if isinstance(list_a[i], cls):
+                    assert list_a[i].base == a0.base
+                if isinstance(list_b[i], cls):
+                    assert list_b[i].base == a0.base
+                # and check that ints are the same within a and b
+                if isinstance(list_a[i], cls):
+                    assert list_a[i].ints == a0.ints
+                if isinstance(list_b[i], cls):
+                    assert list_b[i].ints == b0.ints
+
+            # QFloats should always be base tidy before a multiplication
+            for a in list_a:
+                if isinstance(a, cls):
+                    assert a.is_base_tidy
+            for b in list_b:
+                if isinstance(b, cls):
+                    assert b.is_base_tidy
 
         # prepate the list of multiplications with None values for now
         list_ab = [None] * len(list_a)
@@ -1099,7 +1130,7 @@ class QFloat:
                     list_ab[i] = a * b
                 # simple multiplication and size setting
                 list_ab[i] = a * b
-                list_ab[i].set_lenints(newlength, newints)
+                list_ab[i].set_len_ints(newlength, newints)
 
             else:
                 indices_qfloat_mul.append(i)
