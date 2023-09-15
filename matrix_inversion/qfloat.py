@@ -984,9 +984,9 @@ class QFloat:
         the result might be cropped
         """
         if newlength is None:
-            newlength = len(a) + len(b)
+            newlength = len(a)
         if newints is None:
-            newints = a.ints + b.ints
+            newints = a.ints
 
         # special case when multiplying by unencrypted 0,
         # the result is an unencrypted 0
