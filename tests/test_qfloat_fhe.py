@@ -335,9 +335,9 @@ class TestQFloat(unittest.TestCase):
             multi = circuit.run(np.array([f1, f2]), False)[0]
 
 
-#unittest.main()
+unittest.main()
 
 #suite = unittest.TestLoader().loadTestsFromName('test_qfloat_fhe.TestQFloat.test_add_sub_fhe')
 # suite = unittest.TestLoader().loadTestsFromName('test_qfloat_fhe.TestQFloat.test_div_fhe')
-suite = unittest.TestLoader().loadTestsFromName('test_qfloat_fhe.TestQFloat.test_mul_fhe')
-unittest.TextTestRunner(verbosity=1).run(suite)
+# suite = unittest.TestLoader().loadTestsFromName('test_qfloat_fhe.TestQFloat.test_mul_fhe')
+# unittest.TextTestRunner(verbosity=1).run(suite)
