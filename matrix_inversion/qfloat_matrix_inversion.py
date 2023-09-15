@@ -180,24 +180,24 @@ def zero_list_matrix(n):
     return [[Zero() for j in range(n)] for i in range(n)]
 
 
-def qfloat_list_dot_product(list1, list2):
+def qfloat_list_dot_product(list1, list2, tensorize=True):
     """
     Dot product of two QFloat lists
     """
     if len(list1) != len(list2):
         raise ValueError("Lists should have the same length.")
 
-    result = list1[0] * list2[0]
-    for i in range(1, len(list1)):
-        result += list1[i] * list2[i]  # in place addition is supported
-
-    # # Tensorized way:
-    # multiplications = QFloat.multi_from_mul(
-    #     list1, list2, None, None
-    # )
-    # result = multiplications[0]
-    # for m in multiplications[1:]:
-    #     result += m  # in place addition is supported
+    if tensorize:
+        multiplications = QFloat.multi_from_mul(
+            list1, list2, None, None
+        )
+        result = multiplications[0]
+        for m in multiplications[1:]:
+            result += m 
+    else:
+        result = list1[0] * list2[0]
+        for i in range(1, len(list1)):
+            result += list1[i] * list2[i] 
 
     return result
 
@@ -376,7 +376,7 @@ def qfloat_pivot_matrix(M):
 ###############################################################################
 
 
-def qfloat_lu_decomposition(M, qfloat_len, qfloat_ints, true_division=False):
+def qfloat_lu_decomposition(M, qfloat_len, qfloat_ints, true_division=False, tensorize=True):
     """
     Perform a LU decomposition of square (QFloats 2D-list) matrix M
     The function returns P, L, and U such that M = PLU.
@@ -410,7 +410,8 @@ def qfloat_lu_decomposition(M, qfloat_len, qfloat_ints, true_division=False):
         for i in range(j + 1):
             if i > 0:
                 s1 = qfloat_list_dot_product(
-                    [U[k][j] for k in range(0, i)], [L[i][k] for k in range(0, i)]
+                    [U[k][j] for k in range(0, i)], [L[i][k] for k in range(0, i)],
+                    tensorize
                 )
                 U[i][j] = PM[i][j] + s1.neg()
             else:
@@ -424,7 +425,8 @@ def qfloat_lu_decomposition(M, qfloat_len, qfloat_ints, true_division=False):
         for i in range(j + 1, n):
             if j > 0:
                 s2 = qfloat_list_dot_product(
-                    [U[k][j] for k in range(0, j)], [L[i][k] for k in range(0, j)]
+                    [U[k][j] for k in range(0, j)], [L[i][k] for k in range(0, j)],
+                    tensorize
                 )
                 # L[i][j] = (PM[i][j] - s2) * inv_Ujj
                 if true_division:
@@ -455,13 +457,15 @@ def qfloat_lu_decomposition(M, qfloat_len, qfloat_ints, true_division=False):
 
 
 def qfloat_lu_inverse(
-    P, L, U, qfloat_len, qfloat_ints, true_division=False, debug=False
+    P, L, U, qfloat_len, qfloat_ints, true_division=False, tensorize=True, debug=False
 ):
     """
     Compute inverse using the P,L,U decomposition (operating on QFloats 2D-lists)
 
     true_division: Wether to compute true divisions instead of multiplying by inverse.
     Setting it to True is more precise but slower
+
+    tensorize: Wether to tensorize more or not
     """
     n = len(L)
 
@@ -475,7 +479,8 @@ def qfloat_lu_inverse(
         for j in range(1, n):
             # Y[i, j] = (P[i, j] - np.dot(L[j, :j], Y[i, :j]))
             Y[i][j] = P[i][j] - qfloat_list_dot_product(
-                [L[j][k] for k in range(j)], [Y[i][k] for k in range(j)]
+                [L[j][k] for k in range(j)], [Y[i][k] for k in range(j)],
+                tensorize
             )
 
     # Backward substitution: Solve U * X = Y for X
@@ -483,10 +488,12 @@ def qfloat_lu_inverse(
 
     # precompute inverse of U to make less divisions (simplify U before as we know its range)
     if not true_division:
-        Ujj_inv = [U[j][j].invert(1, qfloat_len, 0) for j in range(n)]
-        # Ujj_inv = QFloat.multi_invert(
-        #     [U[j][j] for j in range(n)], 1, qfloat_len, 0
-        # )
+        if tensorize:
+            Ujj_inv = QFloat.multi_invert(
+                [U[j][j] for j in range(n)], 1, qfloat_len, 0
+            )
+        else:
+            Ujj_inv = [U[j][j].invert(1, qfloat_len, 0) for j in range(n)]
     for i in range(n - 1, -1, -1):
         # X[i, -1] = Y[i, -1] / U[-1, -1]
         if true_division:
@@ -497,7 +504,8 @@ def qfloat_lu_inverse(
         for j in range(n - 2, -1, -1):
             # X[i, j] = (Y[i, j] - np.dot(U[j, j+1:], X[i, j+1:])) / U[j, j]
             temp = Y[i][j] - qfloat_list_dot_product(
-                [U[j][k] for k in range(j + 1, n)], [X[i][k] for k in range(j + 1, n)]
+                [U[j][k] for k in range(j + 1, n)], [X[i][k] for k in range(j + 1, n)],
+                tensorize
             )
             if true_division:
                 X[i][j] = temp / U[j][j]
@@ -549,9 +557,7 @@ def qfloat_inverse_2x2(qfloat_M, qfloat_len, qfloat_ints):
 
 def qfloat_inverse_2x2_multi(qfloat_M, qfloat_len, qfloat_ints):
     """
-    The inverse of a 2x2 matrix has a simple formula: M_inv = 1/det(M) * [[d,-b],[-c,a]]
-    WARNING : The function is optimized for inputs in range [0,2^8] (see samplers)
-    This function uses multi_from_mul for tensorization
+    The tensorized version of qfloat_inverse_2x2
     """
     [a, b] = qfloat_M[0]
     [c, d] = qfloat_M[1]
@@ -607,7 +613,7 @@ def qfloat_lu_L(qfloat_arrays, qfloat_signs, params):
     """
     compute only PLU and returns L
     """
-    [n, qfloat_len, qfloat_ints, qfloat_base, true_division] = params
+    [n, qfloat_len, qfloat_ints, qfloat_base, true_division, _] = params
 
     assert n * n == qfloat_arrays.shape[0]
     assert qfloat_len == qfloat_arrays.shape[1]
@@ -637,7 +643,7 @@ def qfloat_lu_U(qfloat_arrays, qfloat_signs, params):
     """
     compute only PLU and returns U
     """
-    [n, qfloat_len, qfloat_ints, qfloat_base, true_division] = params
+    [n, qfloat_len, qfloat_ints, qfloat_base, true_division, _] = params
 
     assert n * n == qfloat_arrays.shape[0]
     assert qfloat_len == qfloat_arrays.shape[1]
@@ -664,10 +670,14 @@ def qfloat_lu_U(qfloat_arrays, qfloat_signs, params):
 
 
 def qfloat_matrix_inverse(
-    qfloat_arrays, qfloat_signs, n, qfloat_len, qfloat_ints, qfloat_base, true_division
+    qfloat_arrays, qfloat_signs, n, qfloat_len, qfloat_ints, qfloat_base, true_division, tensorize=True
 ):
     """
     Compute the whole inverse
+
+    true division: make true divisions instead of multiplication with inverts
+        this is slower but more precise
+    tensorize: use more tensorization
     """
     assert n * n == qfloat_arrays.shape[0]
     assert qfloat_len == qfloat_arrays.shape[1]
@@ -679,17 +689,20 @@ def qfloat_matrix_inverse(
 
     if n == 2:
         # use shortcut formula
-        qfloat_Minv = qfloat_inverse_2x2(qfloat_M, qfloat_len, qfloat_ints)
+        if tensorize:
+            qfloat_Minv = qfloat_inverse_2x2_multi(qfloat_M, qfloat_len, qfloat_ints)
+        else:
+            qfloat_Minv = qfloat_inverse_2x2(qfloat_M, qfloat_len, qfloat_ints)
 
     else:
         # compute the LU decomposition
         bin_P, qfloat_L, qfloat_U = qfloat_lu_decomposition(
-            qfloat_M, qfloat_len, qfloat_ints, true_division
+            qfloat_M, qfloat_len, qfloat_ints, true_division, tensorize
         )
 
         # compute inverse from P L U
         qfloat_Minv = qfloat_lu_inverse(
-            bin_P, qfloat_L, qfloat_U, qfloat_len, qfloat_ints, true_division
+            bin_P, qfloat_L, qfloat_U, qfloat_len, qfloat_ints, true_division, tensorize
         )
 
     # break the resulting QFloats into arrays:
@@ -744,7 +757,7 @@ def test_qfloat_PLU_python(M, params):
     """
     Test the LU decomposition using QFloats, in python
     """
-    [n, qfloat_len, qfloat_ints, qfloat_base, true_division] = params
+    [n, qfloat_len, qfloat_ints, qfloat_base, true_division, _] = params
 
     # convert it to QFloat arrays
     qfloat_arrays, qfloat_signs = float_matrix_to_qfloat_arrays(
@@ -809,7 +822,7 @@ def test_qfloat_PLU_python(M, params):
 
 
 def run_qfloat_inverse_python(M, params):
-    [n, qfloat_len, qfloat_ints, qfloat_base, true_division] = params
+    [n, qfloat_len, qfloat_ints, qfloat_base, true_division, _] = params
 
     # convert it to QFloat arrays
     qfloat_arrays, qfloat_signs = float_matrix_to_qfloat_arrays(
@@ -829,7 +842,7 @@ def test_qfloat_inverse_python(M, params):
     """
     Test the matrix inverse using QFloats, in python
     """
-    [n, qfloat_len, qfloat_ints, qfloat_base, true_division] = params
+    [n, qfloat_len, qfloat_ints, qfloat_base, true_division, _] = params
 
     # convert it to QFloat arrays
     qfloat_arrays, qfloat_signs = float_matrix_to_qfloat_arrays(
@@ -862,7 +875,7 @@ def test_qfloat_inverse_python(M, params):
 
 def debug_qfloat_inverse_python(sampler, params, verbose=False, N=100):
     """
-    Debug the algorithm to look for big errors
+    Debug the algorithm to look for big errors (used for error benchmarking)
     """
     errors = np.zeros(N)
     nerrors = 0
@@ -871,7 +884,7 @@ def debug_qfloat_inverse_python(sampler, params, verbose=False, N=100):
         # gen random matrix
         M = sampler()
 
-        [n, qfloat_len, qfloat_ints, qfloat_base, true_division] = params
+        [n, qfloat_len, qfloat_ints, qfloat_base, true_division, _] = params
 
         # convert it to QFloat arrays
         qfloat_arrays, qfloat_signs = float_matrix_to_qfloat_arrays(
@@ -956,7 +969,7 @@ def debug_qfloat_inverse_python(sampler, params, verbose=False, N=100):
 
 
 def compile_circuit(params, sampler, circuit_function, verbose=True):
-    [n, qfloat_len, qfloat_ints, qfloat_base, true_division] = params
+    [n, qfloat_len, qfloat_ints, qfloat_base, true_division, tensorize] = params
 
     inputset = []
     for i in range(100):
@@ -1026,7 +1039,7 @@ def run_qfloat_circuit_fhe(
 
 
 def test_qfloat_pivot_fhe(circuit, M, params, simulate=False):
-    [n, qfloat_len, qfloat_ints, qfloat_base, true_division] = params
+    [n, qfloat_len, qfloat_ints, qfloat_base, true_division, _] = params
     qfloat_res, _ = run_qfloat_circuit_fhe(
         circuit, M, qfloat_len, qfloat_ints, qfloat_base, simulate, True
     )
@@ -1043,7 +1056,7 @@ def test_qfloat_pivot_fhe(circuit, M, params, simulate=False):
 
 
 def test_qfloat_LU_U_fhe(circuit, M, params, simulate=False):
-    [n, qfloat_len, qfloat_ints, qfloat_base, true_division] = params
+    [n, qfloat_len, qfloat_ints, qfloat_base, true_division, _] = params
     qfloat_res, _ = run_qfloat_circuit_fhe(
         circuit, M, qfloat_len, qfloat_ints, qfloat_base, simulate
     )
@@ -1062,7 +1075,7 @@ def test_qfloat_LU_U_fhe(circuit, M, params, simulate=False):
 
 
 def test_qfloat_LU_L_fhe(circuit, M, params, simulate=False):
-    [n, qfloat_len, qfloat_ints, qfloat_base, true_division] = params
+    [n, qfloat_len, qfloat_ints, qfloat_base, true_division, _] = params
     qfloat_res, _ = run_qfloat_circuit_fhe(
         circuit, M, qfloat_len, qfloat_ints, qfloat_base, simulate
     )
@@ -1080,7 +1093,7 @@ def test_qfloat_LU_L_fhe(circuit, M, params, simulate=False):
 
 
 def test_qfloat_inverse_fhe(circuit, M, params, simulate=False, verbose=True):
-    [n, qfloat_len, qfloat_ints, qfloat_base, true_division] = params
+    [n, qfloat_len, qfloat_ints, qfloat_base, true_division, _] = params
 
     print("\nScipy inv :")
     scres = sc.linalg.inv(M)
@@ -1123,18 +1136,15 @@ def test_qfloat_inverse_fhe(circuit, M, params, simulate=False, verbose=True):
 # currently their is a bug in concrete.
 
 if __name__ == "__main__":
-    # n=2; qfloat_base = 2; qfloat_len = 23; qfloat_ints = 9;
-    # n=2; qfloat_base = 2; qfloat_len = 44; qfloat_ints = 14;
-    # n=2;  qfloat_base = 16; qfloat_len = 5; qfloat_ints = 3; # CONCRETE BUG
-    # n=2;  qfloat_base = 32; qfloat_len = 5; qfloat_ints = 2; # CONCRETE BUG
 
-    # low precision
+    tensorize = True
+
+    # # low precision
     true_division = False
     n = 2
     qfloat_base = 2
     qfloat_len = 23
     qfloat_ints = 9
-    # n=5; qfloat_base = 2; qfloat_len = 23; qfloat_ints = 9;
 
     # # intermediate precision
     # true_division = False
@@ -1165,18 +1175,19 @@ if __name__ == "__main__":
     sampler = normal_sampler[1]
     # sampler = uniform_sampler[1]
 
-    params = [n, qfloat_len, qfloat_ints, qfloat_base, true_division]
+    params = [n, qfloat_len, qfloat_ints, qfloat_base, true_division, tensorize]
 
-    # # debug
+    # Error benchmarking
+    # ----------------------
     # debug_qfloat_inverse_python(sampler, params, verbose=False, N=1000)
     # exit()
 
     # # gen random matrix
-    # M = sampler()
+    M = sampler()
 
-    # print("Test for Matrix :\n==================")
-    # print(M)
-    # print("")
+    print("Test for Matrix :\n==================")
+    print(M)
+    print("")
 
     # test PLU qf python
     # ----------------------
@@ -1184,9 +1195,9 @@ if __name__ == "__main__":
 
     # test inverse qf python
     # ----------------------
-    # QFloat.reset_stats()
-    # test_qfloat_inverse_python(M, params)
-    # QFloat.show_stats()
+    QFloat.reset_stats()
+    test_qfloat_inverse_python(M, params)
+    QFloat.show_stats()
 
     # test pivot in fhe:
     # ------------------
@@ -1211,52 +1222,53 @@ if __name__ == "__main__":
 
     # test inversion in fhe:
     # -----------------------------
-    # start = time.time()
+    start = time.time()
 
-    # QFloat.reset_stats()
-    # circuit, compilation_time = compile_circuit(params, sampler, qfloat_matrix_inverse)
-    # QFloat.show_stats()
-    # test_qfloat_inverse_fhe(circuit, M, params)
+    QFloat.reset_stats()
+    circuit, compilation_time = compile_circuit(params, sampler, qfloat_matrix_inverse)
+    QFloat.show_stats()
+    test_qfloat_inverse_fhe(circuit, M, params)
 
-    # end = time.time()
-    # print(f"|  Total time : {end-start:.2f} s  |")
+    end = time.time()
+    print(f"|  Total time : {end-start:.2f} s  |")
 
-    ## benchmarking
-    def write_file(text, erase=False):
-        with open("./log-nothing.txt", "a") as file:
-            if erase:
-                file.truncate(0)
-            file.write(text)
+    # Computation time benchmarking
+    # -----------------------------
+    # def write_file(text, erase=False):
+    #     with open("./log-nothing.txt", "a") as file:
+    #         if erase:
+    #             file.truncate(0)
+    #         file.write(text)
 
-    write_file('', True)
+    # write_file('', True)
 
-    for n in [2, 3, 5]:
-        params[0] = n
-        times = []
-        write_file("Benchmark for n = " + str(n) + "\n")
+    # for n in [2, 3, 5]:
+    #     params[0] = n
+    #     times = []
+    #     write_file("Benchmark for n = " + str(n) + "\n")
 
-        for k in range(3):
-            M = sampler()
+    #     for k in range(3):
+    #         M = sampler()
 
-            start = time.time()
+    #         start = time.time()
 
-            circuit, compilation_time = compile_circuit(
-                params, sampler, qfloat_matrix_inverse, False
-            )
+    #         circuit, compilation_time = compile_circuit(
+    #             params, sampler, qfloat_matrix_inverse, False
+    #         )
 
-            # write the time
-            write_file(str(k+1)+"\n")
-            write_file("compilation :" + str(compilation_time) + "\n")
+    #         # write the time
+    #         write_file(str(k+1)+"\n")
+    #         write_file("compilation :" + str(compilation_time) + "\n")
 
-            (compilation_time, running_time) = test_qfloat_inverse_fhe(circuit, M, params, False)
+    #         (compilation_time, running_time) = test_qfloat_inverse_fhe(circuit, M, params, False)
 
-            end = time.time()
-            current_time = end - start
+    #         end = time.time()
+    #         current_time = end - start
 
-            times.append(current_time)
+    #         times.append(current_time)
 
-            write_file("running     :" + str(running_time) + "\n")
-            write_file("total       :" + str(current_time) + "\n")
+    #         write_file("running     :" + str(running_time) + "\n")
+    #         write_file("total       :" + str(current_time) + "\n")
 
-        # write the mean time
-        write_file("\nmean :" + str(np.mean(np.array(times))) + "\n\n\n")
+    #     # write the mean time
+    #     write_file("\nmean :" + str(np.mean(np.array(times))) + "\n\n\n")

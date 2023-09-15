@@ -19,7 +19,7 @@ class EncryptedMatrixInversion:
     circuit: fhe.Circuit
 
     def __init__(
-        self, n, sampler, qfloat_base=2, qfloat_len=32, qfloat_ints=16, true_division=False
+        self, n, sampler, qfloat_base=2, qfloat_len=32, qfloat_ints=16, true_division=False, tensorize=True
     ):
         self.shape = (n, n)
 
@@ -44,7 +44,9 @@ class EncryptedMatrixInversion:
         #     assert quantized_sample.shape == self.shape
 
         compiler = fhe.Compiler(
-            lambda x, y: qfloat_matrix_inverse(x, y, n, self.qfloat_len, self.qfloat_ints, self.qfloat_base, true_division),
+            lambda x, y: qfloat_matrix_inverse(
+                x, y, n, self.qfloat_len, self.qfloat_ints, self.qfloat_base, true_division, tensorize
+            ),
             {"x": "encrypted", "y": "encrypted"},
         )
         self.circuit = compiler.compile(quantized_inputset)
@@ -114,6 +116,8 @@ qfloat_base = QFloats base (2=binary)
 true_division: wether to perform true divisions in the inversion algorithm (more precise but slower)
 """
 
+tensorize = True # seems to be better if dataflow_parallelize=True
+
 # less precise, more prone to errors, but faster
 true_division = False
 qfloat_base = 2
@@ -145,7 +149,7 @@ for name, sampler in {normal_sampler, uniform_sampler}:
         print(f"Compiling...")
         start = time.time()
         encrypted_matrix_inversion = EncryptedMatrixInversion(
-            n, sampler, qfloat_base, qfloat_len, qfloat_ints, true_division
+            n, sampler, qfloat_base, qfloat_len, qfloat_ints, true_division, tensorize
         )
         end = time.time()
         print(f"(took {end - start:.3f} seconds)")
