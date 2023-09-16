@@ -126,7 +126,8 @@ Note that for **n=2** the algorithm is different than for other values of **n**,
 
 #### Computation time benchmarking
 
-To benchmark the FHE computation time (see function `time_benchmark` in `qfloat_matrix_inversion.py`), we ran 3 **compilation / encryption / run** in **low precision** on a 64 cores computing instance, we kept the times and computed the average. We repeated this for `n=2`, `n=3` and also for parameter `tensorize` set to `True` and `False` (`True` adds a bit more tensorization in the inverse algorithm than there is when set to `False`). We could not test higher sizes of matrices or higher precision due to current computational time limitations in FHE.
+To benchmark the FHE computation time (see function `time_benchmark` in `qfloat_matrix_inversion.py`), we ran 3 **compilation / encryption / run** in **low precision** on a 64 cores computing instance, we kept the times and computed the average. We repeated this for `n=2`, `n=3` and also for parameter `tensorize` set to `True` and `False` (`True` adds a bit more tensorization in the inverse algorithm than there is when set to `False`). We could not test higher sizes of matrices or higher precision due to current computational time limitations in FHE.  
+Note: The benchmarking was done on `concrete-numpy 2.1.0` because the `2.2.0`and `2.3.0` did not work for compiling with `n>=3`.
 
 <center>
 
