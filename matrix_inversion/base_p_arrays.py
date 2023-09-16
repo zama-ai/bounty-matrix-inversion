@@ -354,6 +354,8 @@ def insert_array_at_index_3D(A, B, i, j):
     B[:, i, j : j + n] = A[:, :n]
 
 
+# unused (TODO: should increase performance but it actually
+# more often slows downn computations, investiguate why)
 def tensor_fast_boolean_mul(x, boolean):
     """
     Fast multiplication of a tensor with a boolean

@@ -886,28 +886,6 @@ class QFloat:
             n = len(self)
             mularray = fhe.zeros((n, n))
 
-            # if self._base == 2: # use fast tensor boolean multiplication in binary
-            #     # integer part, shift  to the left
-            #     for i in range(0, self._ints):
-            #         mularray[i, 0 : n - (self._ints - 1 - i)] = (
-            #             bpa.tensor_fast_boolean_mul(other._array[self._ints - 1 - i :], self._array[i])
-            #         )
-            #     # float part, shift to the right
-            #     for i in range(self._ints, n):
-            #         mularray[i, 1 + i - self._ints :] = (
-            #             bpa.tensor_fast_boolean_mul(other._array[0 : n - (i - self._ints) - 1], self._array[i])
-            #         )
-            # else:
-            #     # integer part, shift  to the left
-            #     for i in range(0, self._ints):
-            #         mularray[i, 0 : n - (self._ints - 1 - i)] = (
-            #             self._array[i] * other._array[self._ints - 1 - i :]
-            #         )
-            #     # float part, shift to the right
-            #     for i in range(self._ints, n):
-            #         mularray[i, 1 + i - self._ints :] = (
-            #             self._array[i] * other._array[0 : n - (i - self._ints) - 1]
-            #         )
             # integer part, shift  to the left
             for i in range(0, self._ints):
                 mularray[i, 0 : n - (self._ints - 1 - i)] = (
@@ -1025,10 +1003,6 @@ class QFloat:
                 ind1 = 0 if indb >= 0 else -indb
                 ind2 = min(len(b), newlength - indb)
                 if ind2 > ind1:
-                    # if a.base == 2: # use fast boolean multiplication in binary
-                    #     mul = bpa.tensor_fast_boolean_mul(b.array[ind1:ind2], a.array[i])
-                    # else:
-                    #     mul = b.array[ind1:ind2] * a.array[i]
                     mul = b.array[ind1:ind2] * a.array[i]
 
                     if ind2 - ind1 == 1:
@@ -1074,15 +1048,15 @@ class QFloat:
 
         if newlength is None:
             if a0 is not None:
-                newlength=len(a0)
+                newlength = len(a0)
             elif b0 is not None:
-                newlength=len(b0)
+                newlength = len(b0)
 
         if newints is None:
             if a0 is not None:
-                newints=a0.ints
+                newints = a0.ints
             elif b0 is not None:
-                newints=b0.ints      
+                newints = b0.ints
 
         # make sure both the lists and arrays have all the same sizes and bases:
         assert len(list_a) == len(list_b)
@@ -1172,10 +1146,6 @@ class QFloat:
             ind1 = 0 if indb >= 0 else -indb
             ind2 = min(len(b0), newlength - indb)
             if ind2 > ind1:
-                # if a0.base == 2: # use fast boolean multiplication in binary
-                #     mul = bpa.tensor_fast_boolean_mul(b_arrays[:,ind1:ind2], a_arrays[:,i].reshape((n_qfloat_mul,1)))
-                # else:
-                #     mul = b_arrays[:,ind1:ind2] * a_arrays[:,i].reshape((n_qfloat_mul,1))
                 mul = b_arrays[:, ind1:ind2] * a_arrays[:, i].reshape((n_qfloat_mul, 1))
 
                 # if ind2 - ind1 == 1:

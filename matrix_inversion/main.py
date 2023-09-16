@@ -19,7 +19,14 @@ class EncryptedMatrixInversion:
     circuit: fhe.Circuit
 
     def __init__(
-        self, n, sampler, qfloat_base=2, qfloat_len=32, qfloat_ints=16, true_division=False, tensorize=True
+        self,
+        n,
+        sampler,
+        qfloat_base=2,
+        qfloat_len=32,
+        qfloat_ints=16,
+        true_division=False,
+        tensorize=False,
     ):
         self.shape = (n, n)
 
@@ -45,7 +52,14 @@ class EncryptedMatrixInversion:
 
         compiler = fhe.Compiler(
             lambda x, y: qfloat_matrix_inverse(
-                x, y, n, self.qfloat_len, self.qfloat_ints, self.qfloat_base, true_division, tensorize
+                x,
+                y,
+                n,
+                self.qfloat_len,
+                self.qfloat_ints,
+                self.qfloat_base,
+                true_division,
+                tensorize,
             ),
             {"x": "encrypted", "y": "encrypted"},
         )
@@ -114,9 +128,11 @@ qfloat_ints = QFloats integer part length
 qfloat_base = QFloats base (2=binary)
 
 true_division: wether to perform true divisions in the inversion algorithm (more precise but slower)
+tensorize: wether to tensorize more. Seems to be quicker for one or two inversions when n>=3,
+    but for more inversions, tensorize=False seems quicker
 """
 
-tensorize = True # seems to be better if dataflow_parallelize=True
+tensorize = False
 
 # less precise, more prone to errors, but faster
 true_division = False
