@@ -35,6 +35,12 @@ The array can be made in any given base (for instance, in base 2 which is binary
 
 - The array is split between an integer part and a decimal part (after the decimal point). For instance, 34.42 = 34 + 0.32. The length of the integer part must be provided along with the total length of the array to create a QFloat. The longer the integer part is, the higher the **QFloat** can go to encode a number, and the longer the total length is (hence the decimal part is) the more precise it can get.  
 
+<center>
+	
+**Internal representation of a QFloat**
+
+</center>
+
 ![QFloat internal representation](qfloat_image.jpg)
 
 This representation allows to make any operations on the QFloats in FHE, but has a limited range of values. The usual unencrypted float representation that uses an exponent (like 3.442 e-1), cannot be made in FHE to run operations (mostly additions) without disproportionally huge computations.
